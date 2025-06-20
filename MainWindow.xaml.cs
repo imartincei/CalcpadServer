@@ -1,8 +1,11 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using Minio;
 using Minio.DataModel.Args;
+using Minio.DataModel.Tags;
 using CalcpadViewer.Models;
+using CalcpadViewer.Services;
 using System.Globalization;
 
 namespace CalcpadViewer;
@@ -12,11 +15,22 @@ public partial class MainWindow : Window
     private IMinioClient? _minioClient;
     private string _bucketName = "calcpad-storage";
     private List<BlobMetadata> _files = new();
+    private IUserService? _userService;
+    private List<User> _users = new();
+    private User? _selectedUser;
 
     public MainWindow()
     {
         InitializeComponent();
         SecretKeyBox.Password = "calcpad-password-123"; // Default password
+        InitializeUserRoleComboBox();
+    }
+
+    private void InitializeUserRoleComboBox()
+    {
+        UserRoleComboBox.Items.Add(new ComboBoxItem { Content = "Viewer", Tag = UserRole.Viewer });
+        UserRoleComboBox.Items.Add(new ComboBoxItem { Content = "Contributor", Tag = UserRole.Contributor });
+        UserRoleComboBox.Items.Add(new ComboBoxItem { Content = "Admin", Tag = UserRole.Admin });
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -56,6 +70,13 @@ public partial class MainWindow : Window
 
             StatusText.Text = "Connected successfully";
             RefreshButton.IsEnabled = true;
+            UploadButton.IsEnabled = true;
+            
+            // Initialize user service and enable admin tab
+            var apiBaseUrl = $"http{(useSSL ? "s" : "")}://{endpoint.Replace(":9000", ":5000")}"; // Assume API is on port 5000
+            _userService = new UserService(apiBaseUrl);
+            AdminTab.IsEnabled = true;
+            
             await LoadFiles();
         }
         catch (Exception ex)
@@ -334,5 +355,345 @@ public partial class MainWindow : Window
         }
         
         return $"{size:0.##} {sizes[order]}";
+    }
+
+    private async void UploadButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_minioClient == null)
+        {
+            MessageBox.Show("Please connect to MinIO first.", "Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var uploadDialog = new UploadDialog();
+        uploadDialog.Owner = this;
+
+        if (uploadDialog.ShowDialog() == true)
+        {
+            await UploadFile(uploadDialog.SelectedFilePath!, uploadDialog.CustomMetadata, uploadDialog.Tags, uploadDialog.StructuredMetadata);
+        }
+    }
+
+    private async Task UploadFile(string filePath, Dictionary<string, string> customMetadata, Dictionary<string, string> tags, StructuredMetadataRequest structuredMetadata)
+    {
+        if (_minioClient == null) return;
+
+        try
+        {
+            StatusText.Text = "Uploading file...";
+            UploadButton.IsEnabled = false;
+
+            var fileName = Path.GetFileName(filePath);
+            
+            using var fileStream = File.OpenRead(filePath);
+            var putObjectArgs = new PutObjectArgs()
+                .WithBucket(_bucketName)
+                .WithObject(fileName)
+                .WithStreamData(fileStream)
+                .WithObjectSize(fileStream.Length)
+                .WithContentType(GetContentType(fileName));
+
+            // Add custom metadata with x-amz-meta- prefix
+            var headers = new Dictionary<string, string>();
+            
+            if (customMetadata.Any())
+            {
+                foreach (var kvp in customMetadata)
+                {
+                    headers[$"x-amz-meta-{kvp.Key.ToLower()}"] = kvp.Value;
+                }
+            }
+
+            // Add structured metadata
+            if (!string.IsNullOrEmpty(structuredMetadata.OriginalFileName))
+                headers["x-amz-meta-original-filename"] = structuredMetadata.OriginalFileName;
+            if (structuredMetadata.DateCreated.HasValue)
+                headers["x-amz-meta-date-created"] = structuredMetadata.DateCreated.Value.ToString("O");
+            if (structuredMetadata.DateUpdated.HasValue)
+                headers["x-amz-meta-date-updated"] = structuredMetadata.DateUpdated.Value.ToString("O");
+            if (!string.IsNullOrEmpty(structuredMetadata.CreatedBy))
+                headers["x-amz-meta-created-by"] = structuredMetadata.CreatedBy;
+            if (!string.IsNullOrEmpty(structuredMetadata.UpdatedBy))
+                headers["x-amz-meta-updated-by"] = structuredMetadata.UpdatedBy;
+            if (structuredMetadata.DateReviewed.HasValue)
+                headers["x-amz-meta-date-reviewed"] = structuredMetadata.DateReviewed.Value.ToString("O");
+            if (!string.IsNullOrEmpty(structuredMetadata.ReviewedBy))
+                headers["x-amz-meta-reviewed-by"] = structuredMetadata.ReviewedBy;
+            if (!string.IsNullOrEmpty(structuredMetadata.TestedBy))
+                headers["x-amz-meta-tested-by"] = structuredMetadata.TestedBy;
+            if (structuredMetadata.DateTested.HasValue)
+                headers["x-amz-meta-date-tested"] = structuredMetadata.DateTested.Value.ToString("O");
+
+            if (headers.Any())
+            {
+                putObjectArgs.WithHeaders(headers);
+            }
+
+            await _minioClient.PutObjectAsync(putObjectArgs);
+
+            // Set tags if provided
+            if (tags.Any())
+            {
+                var tagging = new Tagging();
+                foreach (var kvp in tags)
+                {
+                    tagging.Tags.Add(kvp.Key, kvp.Value);
+                }
+
+                var setObjectTagsArgs = new SetObjectTagsArgs()
+                    .WithBucket(_bucketName)
+                    .WithObject(fileName)
+                    .WithTagging(tagging);
+
+                await _minioClient.SetObjectTagsAsync(setObjectTagsArgs);
+            }
+            
+            StatusText.Text = $"File '{fileName}' uploaded successfully";
+            MessageBox.Show($"File '{fileName}' uploaded successfully!", "Upload Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            
+            // Refresh the file list
+            await LoadFiles();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Upload failed: {ex.Message}", "Upload Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Upload failed";
+        }
+        finally
+        {
+            UploadButton.IsEnabled = true;
+        }
+    }
+
+    private string GetContentType(string fileName)
+    {
+        var extension = Path.GetExtension(fileName).ToLowerInvariant();
+        return extension switch
+        {
+            ".cpd" => "text/plain",
+            ".cpdz" => "text/plain",
+            ".txt" => "text/plain",
+            ".png" => "image/png",
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".csv" => "text/csv",
+            ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ".json" => "application/json",
+            _ => "application/octet-stream"
+        };
+    }
+
+    // Admin tab event handlers
+    private async void RefreshUsersButton_Click(object sender, RoutedEventArgs e)
+    {
+        await LoadUsers();
+    }
+
+    private async void AddUserButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_userService == null)
+        {
+            MessageBox.Show("User service not initialized. Please connect first.", "Service Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var addUserDialog = new AddUserDialog();
+        addUserDialog.Owner = this;
+
+        if (addUserDialog.ShowDialog() == true && addUserDialog.UserRequest != null)
+        {
+            await CreateUser(addUserDialog.UserRequest);
+        }
+    }
+
+    private async void UsersDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (UsersDataGrid.SelectedItem is User selectedUser)
+        {
+            _selectedUser = selectedUser;
+            DisplayUserDetails(selectedUser);
+        }
+        else
+        {
+            _selectedUser = null;
+            ClearUserDetailsDisplay();
+        }
+    }
+
+    private async void UpdateUserButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedUser == null || _userService == null) return;
+
+        var selectedRoleItem = UserRoleComboBox.SelectedItem as ComboBoxItem;
+        if (selectedRoleItem == null) return;
+
+        var updateRequest = new UpdateUserRequest
+        {
+            Role = (UserRole)selectedRoleItem.Tag,
+            IsActive = UserActiveCheckBox.IsChecked == true
+        };
+
+        await UpdateUser(_selectedUser.Id, updateRequest);
+    }
+
+    private async void DeleteUserButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedUser == null || _userService == null) return;
+
+        var result = MessageBox.Show(
+            $"Are you sure you want to delete user '{_selectedUser.Username}'?", 
+            "Confirm Delete", 
+            MessageBoxButton.YesNo, 
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            await DeleteUser(_selectedUser.Id);
+        }
+    }
+
+    // Admin helper methods
+    private async Task LoadUsers()
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            StatusText.Text = "Loading users...";
+            RefreshUsersButton.IsEnabled = false;
+            
+            _users = await _userService.GetAllUsersAsync();
+            UsersDataGrid.ItemsSource = _users;
+            
+            StatusText.Text = $"Loaded {_users.Count} users";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to load users: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to load users";
+        }
+        finally
+        {
+            RefreshUsersButton.IsEnabled = true;
+        }
+    }
+
+    private async Task CreateUser(RegisterRequest request)
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            StatusText.Text = "Creating user...";
+            AddUserButton.IsEnabled = false;
+
+            var newUser = await _userService.CreateUserAsync(request);
+            
+            StatusText.Text = $"User '{newUser.Username}' created successfully";
+            MessageBox.Show($"User '{newUser.Username}' created successfully!", "User Created", MessageBoxButton.OK, MessageBoxImage.Information);
+            
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to create user: {ex.Message}", "Create Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to create user";
+        }
+        finally
+        {
+            AddUserButton.IsEnabled = true;
+        }
+    }
+
+    private async Task UpdateUser(string userId, UpdateUserRequest request)
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            StatusText.Text = "Updating user...";
+            UpdateUserButton.IsEnabled = false;
+
+            var updatedUser = await _userService.UpdateUserAsync(userId, request);
+            
+            StatusText.Text = $"User '{updatedUser.Username}' updated successfully";
+            MessageBox.Show($"User '{updatedUser.Username}' updated successfully!", "User Updated", MessageBoxButton.OK, MessageBoxImage.Information);
+            
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to update user: {ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to update user";
+        }
+        finally
+        {
+            UpdateUserButton.IsEnabled = true;
+        }
+    }
+
+    private async Task DeleteUser(string userId)
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            StatusText.Text = "Deleting user...";
+            DeleteUserButton.IsEnabled = false;
+
+            var success = await _userService.DeleteUserAsync(userId);
+            
+            if (success)
+            {
+                StatusText.Text = "User deleted successfully";
+                MessageBox.Show("User deleted successfully!", "User Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadUsers();
+                ClearUserDetailsDisplay();
+            }
+            else
+            {
+                MessageBox.Show("Failed to delete user.", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = "Failed to delete user";
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to delete user: {ex.Message}", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to delete user";
+        }
+        finally
+        {
+            DeleteUserButton.IsEnabled = true;
+        }
+    }
+
+    private void DisplayUserDetails(User user)
+    {
+        NoUserSelectionText.Visibility = Visibility.Collapsed;
+        UserDetailsGroup.Visibility = Visibility.Visible;
+        UserActionsGroup.Visibility = Visibility.Visible;
+
+        UserIdText.Text = user.Id;
+        UsernameText.Text = user.Username;
+        UserEmailText.Text = user.Email;
+        UserActiveCheckBox.IsChecked = user.IsActive;
+        LastLoginText.Text = user.LastLoginAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "Never";
+
+        // Set role in combobox
+        foreach (ComboBoxItem item in UserRoleComboBox.Items)
+        {
+            if ((UserRole)item.Tag == user.Role)
+            {
+                UserRoleComboBox.SelectedItem = item;
+                break;
+            }
+        }
+    }
+
+    private void ClearUserDetailsDisplay()
+    {
+        NoUserSelectionText.Visibility = Visibility.Visible;
+        UserDetailsGroup.Visibility = Visibility.Collapsed;
+        UserActionsGroup.Visibility = Visibility.Collapsed;
+        _selectedUser = null;
     }
 }
