@@ -1,0 +1,9 @@
+{
+  "MinIO": {
+    "Endpoint": "localhost:9000",
+    "AccessKey": "calcpad-admin",
+    "SecretKey": "calcpad-password-123",
+    "UseSSL": false,
+    "BucketName": "calcpad-storage"
+  }
+}
