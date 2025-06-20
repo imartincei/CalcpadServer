@@ -78,12 +78,14 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            if (!await _blobStorageService.FileExistsAsync(fileName))
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
             {
                 return NotFound($"File '{fileName}' not found");
             }
 
-            var fileStream = await _blobStorageService.DownloadFileAsync(fileName);
+            var fileStream = await _blobStorageService.DownloadFileAsync(fileName, userContext);
             return File(fileStream, "application/octet-stream", fileName);
         }
         catch (Exception ex)
@@ -99,12 +101,14 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            if (!await _blobStorageService.FileExistsAsync(fileName))
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
             {
                 return NotFound($"File '{fileName}' not found");
             }
 
-            var deleted = await _blobStorageService.DeleteFileAsync(fileName);
+            var deleted = await _blobStorageService.DeleteFileAsync(fileName, userContext);
             
             if (deleted)
             {
@@ -125,7 +129,9 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            var files = await _blobStorageService.ListFilesAsync();
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var files = await _blobStorageService.ListFilesAsync(userContext);
             return Ok(files);
         }
         catch (Exception ex)
@@ -140,7 +146,9 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            var files = await _blobStorageService.ListFilesWithMetadataAsync();
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var files = await _blobStorageService.ListFilesWithMetadataAsync(userContext);
             return Ok(files);
         }
         catch (Exception ex)
@@ -155,7 +163,9 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            var exists = await _blobStorageService.FileExistsAsync(fileName);
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var exists = await _blobStorageService.FileExistsAsync(fileName, userContext);
             return Ok(new { FileName = fileName, Exists = exists });
         }
         catch (Exception ex)
@@ -170,12 +180,14 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            if (!await _blobStorageService.FileExistsAsync(fileName))
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
             {
                 return NotFound($"File '{fileName}' not found");
             }
 
-            var metadata = await _blobStorageService.GetFileMetadataAsync(fileName);
+            var metadata = await _blobStorageService.GetFileMetadataAsync(fileName, userContext);
             return Ok(metadata);
         }
         catch (Exception ex)
@@ -223,12 +235,14 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            if (!await _blobStorageService.FileExistsAsync(fileName))
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
             {
                 return NotFound($"File '{fileName}' not found");
             }
 
-            var tags = await _blobStorageService.GetFileTagsAsync(fileName);
+            var tags = await _blobStorageService.GetFileTagsAsync(fileName, userContext);
             return Ok(new { FileName = fileName, Tags = tags });
         }
         catch (Exception ex)
@@ -243,12 +257,14 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            if (!await _blobStorageService.FileExistsAsync(fileName))
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
             {
                 return NotFound($"File '{fileName}' not found");
             }
 
-            var success = await _blobStorageService.SetFileTagsAsync(fileName, request.Tags);
+            var success = await _blobStorageService.SetFileTagsAsync(fileName, request.Tags, userContext);
             
             if (success)
             {
@@ -269,12 +285,14 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            if (!await _blobStorageService.FileExistsAsync(fileName))
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
             {
                 return NotFound($"File '{fileName}' not found");
             }
 
-            var success = await _blobStorageService.DeleteFileTagsAsync(fileName);
+            var success = await _blobStorageService.DeleteFileTagsAsync(fileName, userContext);
             
             if (success)
             {
@@ -295,7 +313,9 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            var versions = await _blobStorageService.ListFileVersionsAsync(baseFileName);
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var versions = await _blobStorageService.ListFileVersionsAsync(baseFileName, userContext);
             return Ok(versions);
         }
         catch (Exception ex)
@@ -310,7 +330,9 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            var latestMetadata = await _blobStorageService.GetLatestVersionMetadataAsync(baseFileName);
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var latestMetadata = await _blobStorageService.GetLatestVersionMetadataAsync(baseFileName, userContext);
             return Ok(latestMetadata);
         }
         catch (FileNotFoundException)
@@ -329,7 +351,9 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            var fileStream = await _blobStorageService.DownloadLatestVersionAsync(baseFileName);
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var fileStream = await _blobStorageService.DownloadLatestVersionAsync(baseFileName, userContext);
             return File(fileStream, "application/octet-stream", baseFileName);
         }
         catch (FileNotFoundException)
@@ -349,7 +373,9 @@ public class BlobStorageController : ControllerBase
     {
         try
         {
-            var success = await _blobStorageService.DeleteAllVersionsAsync(baseFileName);
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var success = await _blobStorageService.DeleteAllVersionsAsync(baseFileName, userContext);
             
             if (success)
             {

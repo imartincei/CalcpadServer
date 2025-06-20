@@ -8,6 +8,7 @@ namespace CalcpadServer.Api.Services;
 public interface IBlobStorageService
 {
     Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
+    Task<string> UploadFileAsync(string fileName, Stream fileStream, string contentType = "application/octet-stream");
     Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
     Task<Stream> DownloadFileAsync(string fileName, UserContext userContext);
     Task<Stream> DownloadLatestVersionAsync(string baseFileName, UserContext userContext);
@@ -105,7 +106,7 @@ public class BlobStorageService : IBlobStorageService
             // Set tags if provided
             if (tags != null && tags.Any())
             {
-                await SetFileTagsAsync(versionedFileName, tags);
+                await SetFileTagsAsync(versionedFileName, tags, userContext);
             }
             
             _logger.LogInformation("File {VersionedFileName} uploaded successfully as version 1 of {BaseFileName}", versionedFileName, baseFileName);
@@ -114,6 +115,31 @@ public class BlobStorageService : IBlobStorageService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error uploading file {BaseFileName}", baseFileName);
+            throw;
+        }
+    }
+
+    public async Task<string> UploadFileAsync(string fileName, Stream fileStream, string contentType = "application/octet-stream")
+    {
+        try
+        {
+            await EnsureBucketExistsAsync();
+            
+            var putObjectArgs = new PutObjectArgs()
+                .WithBucket(_bucketName)
+                .WithObject(fileName)
+                .WithStreamData(fileStream)
+                .WithObjectSize(fileStream.Length)
+                .WithContentType(contentType);
+
+            await _minioClient.PutObjectAsync(putObjectArgs);
+            
+            _logger.LogInformation("Simple file {FileName} uploaded successfully", fileName);
+            return fileName;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading simple file {FileName}", fileName);
             throw;
         }
     }
@@ -294,13 +320,13 @@ public class BlobStorageService : IBlobStorageService
                 }
             }
 
-            var tags = await GetFileTagsAsync(fileName);
+            var tags = await GetFileTagsAsync(fileName, userContext);
 
             return new BlobMetadata
             {
                 FileName = fileName,
                 Size = objectStat.Size,
-                LastModified = objectStat.LastModifiedDateTime ?? DateTime.MinValue,
+                LastModified = objectStat.LastModified,
                 ContentType = objectStat.ContentType ?? "application/octet-stream",
                 ETag = objectStat.ETag ?? string.Empty,
                 CustomMetadata = customMetadata,
@@ -444,7 +470,7 @@ public class BlobStorageService : IBlobStorageService
 
             if (tags != null && tags.Any())
             {
-                await SetFileTagsAsync(versionedFileName, tags);
+                await SetFileTagsAsync(versionedFileName, tags, userContext);
             }
             
             _logger.LogInformation("File {VersionedFileName} created as version {Version} of {BaseFileName}", versionedFileName, nextVersion, baseFileName);
