@@ -52,7 +52,7 @@ public class UserService : IUserService
         _logger.LogInformation("Default admin user created: {Username}", adminUser.Username);
     }
 
-    public async Task<AuthResponse?> LoginAsync(LoginRequest request)
+    public Task<AuthResponse?> LoginAsync(LoginRequest request)
     {
         try
         {
@@ -63,7 +63,7 @@ public class UserService : IUserService
             if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
             {
                 _logger.LogWarning("Login failed for username: {Username}", request.Username);
-                return null;
+                return Task.FromResult<AuthResponse?>(null);
             }
 
             user.LastLoginAt = DateTime.UtcNow;
@@ -72,21 +72,21 @@ public class UserService : IUserService
 
             _logger.LogInformation("User {Username} logged in successfully", user.Username);
             
-            return new AuthResponse
+            return Task.FromResult<AuthResponse?>(new AuthResponse
             {
                 Token = token,
                 User = user,
                 ExpiresAt = expiresAt
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during login for username: {Username}", request.Username);
-            return null;
+            return Task.FromResult<AuthResponse?>(null);
         }
     }
 
-    public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
+    public Task<AuthResponse?> RegisterAsync(RegisterRequest request)
     {
         try
         {
@@ -94,14 +94,14 @@ public class UserService : IUserService
             if (_users.Values.Any(u => u.Username.Equals(request.Username, StringComparison.OrdinalIgnoreCase)))
             {
                 _logger.LogWarning("Registration failed - username already exists: {Username}", request.Username);
-                return null;
+                return Task.FromResult<AuthResponse?>(null);
             }
 
             // Check if email already exists
             if (_users.Values.Any(u => u.Email.Equals(request.Email, StringComparison.OrdinalIgnoreCase)))
             {
                 _logger.LogWarning("Registration failed - email already exists: {Email}", request.Email);
-                return null;
+                return Task.FromResult<AuthResponse?>(null);
             }
 
             var user = new User
@@ -121,17 +121,17 @@ public class UserService : IUserService
 
             _logger.LogInformation("User {Username} registered successfully with role {Role}", user.Username, user.Role);
 
-            return new AuthResponse
+            return Task.FromResult<AuthResponse?>(new AuthResponse
             {
                 Token = token,
                 User = user,
                 ExpiresAt = expiresAt
-            };
+            });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during registration for username: {Username}", request.Username);
-            return null;
+            return Task.FromResult<AuthResponse?>(null);
         }
     }
 
@@ -153,7 +153,7 @@ public class UserService : IUserService
         return await Task.FromResult(_users.Values.Where(u => u.IsActive));
     }
 
-    public async Task<bool> DeleteUserAsync(string userId)
+    public Task<bool> DeleteUserAsync(string userId)
     {
         try
         {
@@ -161,18 +161,18 @@ public class UserService : IUserService
             {
                 user.IsActive = false;
                 _logger.LogInformation("User {Username} deactivated", user.Username);
-                return true;
+                return Task.FromResult(true);
             }
-            return false;
+            return Task.FromResult(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting user {UserId}", userId);
-            return false;
+            return Task.FromResult(false);
         }
     }
 
-    public async Task<bool> UpdateUserRoleAsync(string userId, UserRole role)
+    public Task<bool> UpdateUserRoleAsync(string userId, UserRole role)
     {
         try
         {
@@ -180,14 +180,14 @@ public class UserService : IUserService
             {
                 user.Role = role;
                 _logger.LogInformation("User {Username} role updated to {Role}", user.Username, role);
-                return true;
+                return Task.FromResult(true);
             }
-            return false;
+            return Task.FromResult(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating role for user {UserId}", userId);
-            return false;
+            return Task.FromResult(false);
         }
     }
 

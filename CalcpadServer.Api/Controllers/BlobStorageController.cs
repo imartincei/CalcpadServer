@@ -211,7 +211,7 @@ public class BlobStorageController : ControllerBase
             var userContext = (UserContext)HttpContext.Items["UserContext"]!;
             
             using var stream = request.File.OpenReadStream();
-            var versionedFileName = await _blobStorageService.CreateNewVersionAsync(
+            var result = await _blobStorageService.CreateNewVersionWithResultAsync(
                 baseFileName,
                 stream,
                 userContext,
@@ -220,8 +220,7 @@ public class BlobStorageController : ControllerBase
                 request.Tags,
                 request.StructuredMetadata);
 
-            var nextVersion = await _blobStorageService.GetNextVersionNumberAsync(baseFileName, userContext) - 1; // Subtract 1 since we just created it
-            return Ok(new { VersionedFileName = versionedFileName, Message = $"New version created successfully", BaseFileName = baseFileName, Version = nextVersion });
+            return Ok(new { VersionedFileName = result.VersionedFileName, Message = $"New version created successfully", BaseFileName = result.BaseFileName, Version = result.Version });
         }
         catch (Exception ex)
         {
@@ -387,6 +386,29 @@ public class BlobStorageController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting all versions for {BaseFileName}", baseFileName);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
+    [HttpPost("test-metadata/{fileName}")]
+    public async Task<IActionResult> TestMetadata(string fileName, [FromBody] Dictionary<string, string> testMetadata)
+    {
+        try
+        {
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            var result = await _blobStorageService.TestMetadataStorageAsync(fileName, testMetadata, userContext);
+            
+            return Ok(new { 
+                FileName = fileName, 
+                SentMetadata = testMetadata,
+                RetrievedMetadata = result,
+                Success = result.Any()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error testing metadata for file {FileName}", fileName);
             return StatusCode(500, "Internal server error");
         }
     }
