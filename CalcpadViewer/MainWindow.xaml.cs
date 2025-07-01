@@ -206,7 +206,7 @@ public partial class MainWindow : Window
             {
                 FileName = fileName,
                 Size = objectStat.Size,
-                LastModified = objectStat.LastModifiedDateTime ?? DateTime.MinValue,
+                LastModified = objectStat.LastModified,
                 ContentType = objectStat.ContentType ?? "application/octet-stream",
                 ETag = objectStat.ETag ?? string.Empty,
                 CustomMetadata = customMetadata,
@@ -505,7 +505,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void UsersDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void UsersDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (UsersDataGrid.SelectedItem is User selectedUser)
         {
