@@ -185,38 +185,38 @@ public partial class MainWindow : Window
                         switch (key.ToLower())
                         {
                             case "original-filename":
-                                metadata.OriginalFileName = kvp.Value;
+                                structuredMetadata.OriginalFileName = kvp.Value;
                                 break;
                             case "date-created":
                                 if (DateTime.TryParse(kvp.Value, out var dateCreated))
-                                    metadata.DateCreated = dateCreated;
+                                    structuredMetadata.DateCreated = dateCreated;
                                 break;
                             case "date-updated":
                                 if (DateTime.TryParse(kvp.Value, out var dateUpdated))
-                                    metadata.DateUpdated = dateUpdated;
+                                    structuredMetadata.DateUpdated = dateUpdated;
                                 break;
                             case "version":
-                                metadata.Version = kvp.Value;
+                                structuredMetadata.Version = kvp.Value;
                                 break;
                             case "created-by":
-                                metadata.CreatedBy = kvp.Value;
+                                structuredMetadata.CreatedBy = kvp.Value;
                                 break;
                             case "updated-by":
-                                metadata.UpdatedBy = kvp.Value;
+                                structuredMetadata.UpdatedBy = kvp.Value;
                                 break;
                             case "date-reviewed":
                                 if (DateTime.TryParse(kvp.Value, out var dateReviewed))
-                                    metadata.DateReviewed = dateReviewed;
+                                    structuredMetadata.DateReviewed = dateReviewed;
                                 break;
                             case "reviewed-by":
-                                metadata.ReviewedBy = kvp.Value;
+                                structuredMetadata.ReviewedBy = kvp.Value;
                                 break;
                             case "tested-by":
-                                metadata.TestedBy = kvp.Value;
+                                structuredMetadata.TestedBy = kvp.Value;
                                 break;
                             case "date-tested":
                                 if (DateTime.TryParse(kvp.Value, out var dateTested))
-                                    metadata.DateTested = dateTested;
+                                    structuredMetadata.DateTested = dateTested;
                                 break;
                             default:
                                 // Add to custom metadata if not a structured field
