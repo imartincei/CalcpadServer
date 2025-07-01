@@ -73,7 +73,7 @@ public partial class MainWindow : Window
             UploadButton.IsEnabled = true;
             
             // Initialize user service and enable admin tab
-            var apiBaseUrl = $"http{(useSSL ? "s" : "")}://{endpoint.Replace(":9000", ":5000")}"; // Assume API is on port 5000
+            var apiBaseUrl = $"http{(useSSL ? "s" : "")}://{endpoint.Replace(":9000", ":5159")}"; // API is on port 5159
             _userService = new UserService(apiBaseUrl);
             AdminTab.IsEnabled = true;
             

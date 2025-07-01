@@ -5,5 +5,9 @@
     "SecretKey": "calcpad-password-123",
     "UseSSL": false,
     "BucketName": "calcpad-storage"
+  },
+  "Api": {
+    "Endpoint": "localhost:5159",
+    "UseSSL": false
   }
 }
