@@ -56,3 +56,9 @@ nunit-*.xml
 # VS code
 .vs
 /CalcpadServer.Api/CalcpadServer.Api.csproj.user
+
+# Subfolders
+/CalcpadViewer/[Bb]in/
+/CalcpadViewer/[Oo]bj/
+/CalcpadServer.Api/[Bb]in/
+/CalcpadServer.Api/[Oo]bj/
