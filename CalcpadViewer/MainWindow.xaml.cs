@@ -481,6 +481,7 @@ public partial class MainWindow : Window
             if (tags.Any())
             {
                 var tagging = new Tagging();
+                tagging.Tags = new Dictionary<string, string>();
                 foreach (var kvp in tags)
                 {
                     tagging.Tags.Add(kvp.Key, kvp.Value);
