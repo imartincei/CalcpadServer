@@ -450,9 +450,11 @@ public partial class MainWindow : Window
                 }
             }
 
-            // Add structured metadata
+            // Add structured metadata with proper x-amz-meta- prefixes
             if (!string.IsNullOrEmpty(structuredMetadata.OriginalFileName))
                 headers["x-amz-meta-original-filename"] = structuredMetadata.OriginalFileName;
+            if (!string.IsNullOrEmpty(structuredMetadata.Version))
+                headers["x-amz-meta-version"] = structuredMetadata.Version;
             if (structuredMetadata.DateCreated.HasValue)
                 headers["x-amz-meta-date-created"] = structuredMetadata.DateCreated.Value.ToString("O");
             if (structuredMetadata.DateUpdated.HasValue)
