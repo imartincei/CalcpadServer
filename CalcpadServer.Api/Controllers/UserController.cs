@@ -55,6 +55,27 @@ public class UserController : ControllerBase
         }
     }
 
+    [HttpPut("{userId}")]
+    public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateUserRequest request)
+    {
+        try
+        {
+            var user = await _userService.UpdateUserAsync(userId, request);
+            
+            if (user == null)
+            {
+                return NotFound(new { message = "User not found" });
+            }
+
+            return Ok(user);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user {UserId}", userId);
+            return StatusCode(500, "Internal server error");
+        }
+    }
+
     [HttpPut("{userId}/role")]
     public async Task<IActionResult> UpdateUserRole(string userId, [FromBody] UpdateRoleRequest request)
     {

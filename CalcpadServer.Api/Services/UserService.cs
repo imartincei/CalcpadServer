@@ -17,6 +17,7 @@ public interface IUserService
     Task<User?> GetUserByUsernameAsync(string username);
     Task<IEnumerable<User>> GetAllUsersAsync();
     Task<bool> DeleteUserAsync(string userId);
+    Task<User?> UpdateUserAsync(string userId, UpdateUserRequest request);
     Task<bool> UpdateUserRoleAsync(string userId, UserRole role);
     Task<UserContext?> GetUserContextFromTokenAsync(string token);
     Task EnsureDefaultAdminAsync();
@@ -173,6 +174,30 @@ public class UserService : IUserService
         }
     }
 
+    public async Task<User?> UpdateUserAsync(string userId, UpdateUserRequest request)
+    {
+        try
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return null;
+            }
+
+            user.Role = request.Role;
+            user.IsActive = request.IsActive;
+            await _context.SaveChangesAsync();
+            
+            _logger.LogInformation("User {Username} updated: Role={Role}, IsActive={IsActive}", user.Username, request.Role, request.IsActive);
+            return user;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating user {UserId}", userId);
+            return null;
+        }
+    }
+
     public async Task<bool> UpdateUserRoleAsync(string userId, UserRole role)
     {
         try
@@ -213,9 +238,9 @@ public class UserService : IUserService
             }, out SecurityToken validatedToken);
 
             var jwtToken = (JwtSecurityToken)validatedToken;
-            var userId = jwtToken.Claims.First(x => x.Type == ClaimTypes.NameIdentifier).Value;
-            var username = jwtToken.Claims.First(x => x.Type == ClaimTypes.Name).Value;
-            var role = Enum.Parse<UserRole>(jwtToken.Claims.First(x => x.Type == ClaimTypes.Role).Value);
+            var userId = jwtToken.Claims.First(x => x.Type == "nameid").Value;
+            var username = jwtToken.Claims.First(x => x.Type == "unique_name").Value;
+            var role = Enum.Parse<UserRole>(jwtToken.Claims.First(x => x.Type == "role").Value);
 
             // Verify user still exists and is active
             var user = await _context.Users.FindAsync(userId);

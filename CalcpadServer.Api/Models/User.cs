@@ -33,6 +33,12 @@ public class RegisterRequest
     public UserRole Role { get; set; } = UserRole.Contributor;
 }
 
+public class UpdateUserRequest
+{
+    public UserRole Role { get; set; }
+    public bool IsActive { get; set; }
+}
+
 public class AuthResponse
 {
     public string Token { get; set; } = string.Empty;

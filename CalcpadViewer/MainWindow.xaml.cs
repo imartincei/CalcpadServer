@@ -176,6 +176,7 @@ public partial class MainWindow : Window
             {
                 foreach (var kvp in objectStat.MetaData)
                 {
+                    // Process all metadata, including system metadata
                     if (kvp.Key.StartsWith("x-amz-meta-", StringComparison.OrdinalIgnoreCase))
                     {
                         var key = kvp.Key.Substring("x-amz-meta-".Length);
@@ -222,6 +223,11 @@ public partial class MainWindow : Window
                                 customMetadata[key] = kvp.Value;
                                 break;
                         }
+                    }
+                    else
+                    {
+                        // Add system metadata (non user-defined) to custom metadata for visibility
+                        customMetadata[$"[System] {kvp.Key}"] = kvp.Value;
                     }
                 }
             }
@@ -299,7 +305,7 @@ public partial class MainWindow : Window
         ContentTypeText.Text = metadata.ContentType;
         ETagText.Text = metadata.ETag;
 
-        // Structured Metadata
+        // Structured Metadata - Always show section, display "None" if empty
         var structuredItems = new List<KeyValueDisplay>();
         if (!string.IsNullOrEmpty(metadata.Structured.OriginalFileName))
             structuredItems.Add(new KeyValueDisplay { Key = "Original Filename", Value = metadata.Structured.OriginalFileName });
@@ -322,38 +328,47 @@ public partial class MainWindow : Window
         if (metadata.Structured.DateTested.HasValue)
             structuredItems.Add(new KeyValueDisplay { Key = "Date Tested", Value = metadata.Structured.DateTested.Value.ToString("yyyy-MM-dd HH:mm:ss") });
 
+        StructuredMetadataGroup.Visibility = Visibility.Visible;
         if (structuredItems.Any())
         {
-            StructuredMetadataGroup.Visibility = Visibility.Visible;
             StructuredMetadataItems.ItemsSource = structuredItems;
         }
         else
         {
-            StructuredMetadataGroup.Visibility = Visibility.Collapsed;
+            StructuredMetadataItems.ItemsSource = new List<KeyValueDisplay> 
+            { 
+                new KeyValueDisplay { Key = "Status", Value = "No structured metadata found" } 
+            };
         }
 
-        // Custom Metadata
+        // Custom Metadata - Always show section, display "None" if empty
+        CustomMetadataGroup.Visibility = Visibility.Visible;
         if (metadata.CustomMetadata.Any())
         {
-            CustomMetadataGroup.Visibility = Visibility.Visible;
             var customItems = metadata.CustomMetadata.Select(kvp => new KeyValueDisplay { Key = kvp.Key, Value = kvp.Value }).ToList();
             CustomMetadataItems.ItemsSource = customItems;
         }
         else
         {
-            CustomMetadataGroup.Visibility = Visibility.Collapsed;
+            CustomMetadataItems.ItemsSource = new List<KeyValueDisplay> 
+            { 
+                new KeyValueDisplay { Key = "Status", Value = "No custom metadata found" } 
+            };
         }
 
-        // Tags
+        // Tags - Always show section, display "None" if empty
+        TagsGroup.Visibility = Visibility.Visible;
         if (metadata.Tags.Any())
         {
-            TagsGroup.Visibility = Visibility.Visible;
             var tagItems = metadata.Tags.Select(kvp => new KeyValueDisplay { Key = kvp.Key, Value = kvp.Value }).ToList();
             TagsItems.ItemsSource = tagItems;
         }
         else
         {
-            TagsGroup.Visibility = Visibility.Collapsed;
+            TagsItems.ItemsSource = new List<KeyValueDisplay> 
+            { 
+                new KeyValueDisplay { Key = "Status", Value = "No tags found" } 
+            };
         }
     }
 
@@ -361,9 +376,14 @@ public partial class MainWindow : Window
     {
         NoSelectionText.Visibility = Visibility.Visible;
         FileInfoGroup.Visibility = Visibility.Collapsed;
-        StructuredMetadataGroup.Visibility = Visibility.Collapsed;
-        CustomMetadataGroup.Visibility = Visibility.Collapsed;
-        TagsGroup.Visibility = Visibility.Collapsed;
+        StructuredMetadataGroup.Visibility = Visibility.Visible;
+        CustomMetadataGroup.Visibility = Visibility.Visible;
+        TagsGroup.Visibility = Visibility.Visible;
+        
+        // Clear the content of metadata sections
+        StructuredMetadataItems.ItemsSource = null;
+        CustomMetadataItems.ItemsSource = null;
+        TagsItems.ItemsSource = null;
     }
 
     private string FormatFileSize(long bytes)

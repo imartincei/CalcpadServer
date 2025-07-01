@@ -132,7 +132,7 @@
                                 </GroupBox>
                                 
                                 <!-- Structured Metadata -->
-                                <GroupBox x:Name="StructuredMetadataGroup" Header="Structured Metadata" Visibility="Collapsed" Margin="0,0,0,10">
+                                <GroupBox x:Name="StructuredMetadataGroup" Header="Structured Metadata" Margin="0,0,0,10">
                                     <ItemsControl x:Name="StructuredMetadataItems">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -150,7 +150,7 @@
                                 </GroupBox>
                                 
                                 <!-- Custom Metadata -->
-                                <GroupBox x:Name="CustomMetadataGroup" Header="Custom Metadata" Visibility="Collapsed" Margin="0,0,0,10">
+                                <GroupBox x:Name="CustomMetadataGroup" Header="Custom Metadata" Margin="0,0,0,10">
                                     <ItemsControl x:Name="CustomMetadataItems">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -168,7 +168,7 @@
                                 </GroupBox>
                                 
                                 <!-- Tags -->
-                                <GroupBox x:Name="TagsGroup" Header="Tags" Visibility="Collapsed">
+                                <GroupBox x:Name="TagsGroup" Header="Tags">
                                     <ItemsControl x:Name="TagsItems">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -216,6 +216,7 @@
                             
                             <DataGrid x:Name="UsersDataGrid" Grid.Row="1" Margin="5" 
                                       AutoGenerateColumns="False" SelectionMode="Single"
+                                      CanUserAddRows="False" CanUserDeleteRows="False"
                                       SelectionChanged="UsersDataGrid_SelectionChanged">
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Username" Binding="{Binding Username}" Width="120"/>
