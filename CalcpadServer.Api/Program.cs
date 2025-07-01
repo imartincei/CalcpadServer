@@ -1,6 +1,8 @@
+using CalcpadServer.Api.Data;
 using CalcpadServer.Api.Services;
 using CalcpadServer.Api.Middleware;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Minio;
@@ -11,6 +13,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Configure Entity Framework with SQLite
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=calcpad.db"));
 
 // Configure MinIO
 builder.Services.AddSingleton<IMinioClient>(provider =>
@@ -69,5 +75,18 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Initialize database and create default admin user
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var userService = scope.ServiceProvider.GetRequiredService<IUserService>();
+    
+    // Ensure database is created
+    await context.Database.EnsureCreatedAsync();
+    
+    // Create default admin user
+    await userService.EnsureDefaultAdminAsync();
+}
 
 app.Run();

@@ -79,6 +79,9 @@
                                         Margin="0,5,5,5" Padding="5" Click="UploadButton_Click" IsEnabled="False"/>
                                 <Button x:Name="DownloadButton" Content="Download File" 
                                         Margin="0,5,5,5" Padding="5" Click="DownloadButton_Click" IsEnabled="False"/>
+                                <Button x:Name="DeleteButton" Content="Delete File" 
+                                        Margin="0,5,5,5" Padding="5" Click="DeleteButton_Click" IsEnabled="False"
+                                        Background="LightCoral"/>
                             </StackPanel>
                             
                             <ListBox x:Name="FilesListBox" Grid.Row="1" Margin="5" 

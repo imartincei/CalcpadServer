@@ -24,6 +24,7 @@ services:
       - "5159:5159"
     volumes:
       - ./CalcpadServer.Api:/app
+      - calcpad-db:/app/data
     working_dir: /app
     command: dotnet run --urls "http://0.0.0.0:5159"
     depends_on:
@@ -33,4 +34,6 @@ services:
 
 volumes:
   minio-data:
+    driver: local
+  calcpad-db:
     driver: local

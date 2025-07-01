@@ -73,6 +73,7 @@ public partial class MainWindow : Window
             RefreshButton.IsEnabled = true;
             UploadButton.IsEnabled = true;
             DownloadButton.IsEnabled = true;
+            DeleteButton.IsEnabled = true;
             
             // Initialize user service and try admin login
             var apiBaseUrl = $"http{(useSSL ? "s" : "")}://{endpoint.Replace(":9000", ":5159")}"; // API is on port 5159
@@ -777,5 +778,59 @@ public partial class MainWindow : Window
             });
 
         await _minioClient.GetObjectAsync(getObjectArgs);
+    }
+
+    private async void DeleteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (FilesListBox.SelectedItem is not string selectedFileName)
+        {
+            MessageBox.Show("Please select a file to delete.", "No File Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        // Confirm deletion
+        var result = MessageBox.Show(
+            $"Are you sure you want to delete '{selectedFileName}'?\n\nThis action cannot be undone.",
+            "Confirm Delete",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (result != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            StatusText.Text = "Deleting file...";
+            DeleteButton.IsEnabled = false;
+
+            await DeleteFile(selectedFileName);
+            
+            MessageBox.Show($"File '{selectedFileName}' deleted successfully.", "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            StatusText.Text = "File deleted successfully";
+            
+            // Refresh the file list and clear metadata display
+            await LoadFiles();
+            ClearMetadataDisplay();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to delete file: {ex.Message}", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Delete failed";
+        }
+        finally
+        {
+            DeleteButton.IsEnabled = true;
+        }
+    }
+
+    private async Task DeleteFile(string fileName)
+    {
+        var removeObjectArgs = new RemoveObjectArgs()
+            .WithBucket(_bucketName)
+            .WithObject(fileName);
+
+        await _minioClient.RemoveObjectAsync(removeObjectArgs);
     }
 }
