@@ -47,47 +47,34 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
                         <Label Grid.Row="0" Grid.Column="0" Content="Original Name:" VerticalAlignment="Center"/>
                         <TextBox x:Name="OriginalFileNameTextBox" Grid.Row="0" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="1" Grid.Column="0" Content="Created By:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="CreatedByTextBox" Grid.Row="1" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="1" Grid.Column="0" Content="Updated By:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="UpdatedByTextBox" Grid.Row="1" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="2" Grid.Column="0" Content="Updated By:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="UpdatedByTextBox" Grid.Row="2" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="2" Grid.Column="0" Content="Date Created:" VerticalAlignment="Center"/>
+                        <DatePicker x:Name="DateCreatedPicker" Grid.Row="2" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="3" Grid.Column="0" Content="Date Created:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateCreatedPicker" Grid.Row="3" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="3" Grid.Column="0" Content="Date Updated:" VerticalAlignment="Center"/>
+                        <DatePicker x:Name="DateUpdatedPicker" Grid.Row="3" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="4" Grid.Column="0" Content="Date Updated:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateUpdatedPicker" Grid.Row="4" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="4" Grid.Column="0" Content="Reviewed By:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="ReviewedByTextBox" Grid.Row="4" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="5" Grid.Column="0" Content="Reviewed By:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="ReviewedByTextBox" Grid.Row="5" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="5" Grid.Column="0" Content="Date Reviewed:" VerticalAlignment="Center"/>
+                        <DatePicker x:Name="DateReviewedPicker" Grid.Row="5" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="6" Grid.Column="0" Content="Date Reviewed:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateReviewedPicker" Grid.Row="6" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="6" Grid.Column="0" Content="Tested By:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="TestedByTextBox" Grid.Row="6" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="7" Grid.Column="0" Content="Tested By:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="TestedByTextBox" Grid.Row="7" Grid.Column="1" Margin="5"/>
-                        
-                        <Label Grid.Row="8" Grid.Column="0" Content="Date Tested:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateTestedPicker" Grid.Row="8" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="7" Grid.Column="0" Content="Date Tested:" VerticalAlignment="Center"/>
+                        <DatePicker x:Name="DateTestedPicker" Grid.Row="7" Grid.Column="1" Margin="5"/>
                     </Grid>
                 </GroupBox>
                 
-                <!-- Custom Metadata -->
-                <GroupBox Header="Custom Metadata" Margin="0,0,0,10">
-                    <StackPanel>
-                        <Label Content="Key-Value pairs (one per line, format: key=value):"/>
-                        <TextBox x:Name="CustomMetadataTextBox" Height="80" TextWrapping="Wrap" 
-                                 VerticalScrollBarVisibility="Auto" AcceptsReturn="True" Margin="0,5"/>
-                        <TextBlock Text="Example: category=document" FontStyle="Italic" Foreground="Gray" FontSize="10"/>
-                    </StackPanel>
-                </GroupBox>
                 
                 <!-- Tags -->
                 <GroupBox Header="Tags" Margin="0,0,0,10">

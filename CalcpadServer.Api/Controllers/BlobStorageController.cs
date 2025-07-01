@@ -38,9 +38,8 @@ public class BlobStorageController : ControllerBase
                 stream, 
                 userContext,
                 request.File.ContentType,
-                request.Metadata,
                 request.Tags,
-                request.StructuredMetadata);
+                request.Metadata);
             
             return Ok(new { VersionedFileName = fileName, Message = "File uploaded successfully as version 1", BaseFileName = request.File.FileName, Version = 1 });
         }
@@ -216,9 +215,8 @@ public class BlobStorageController : ControllerBase
                 stream,
                 userContext,
                 request.File.ContentType,
-                request.Metadata,
                 request.Tags,
-                request.StructuredMetadata);
+                request.Metadata);
 
             return Ok(new { VersionedFileName = result.VersionedFileName, Message = $"New version created successfully", BaseFileName = result.BaseFileName, Version = result.Version });
         }
@@ -390,26 +388,4 @@ public class BlobStorageController : ControllerBase
         }
     }
 
-    [HttpPost("test-metadata/{fileName}")]
-    public async Task<IActionResult> TestMetadata(string fileName, [FromBody] Dictionary<string, string> testMetadata)
-    {
-        try
-        {
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
-            
-            var result = await _blobStorageService.TestMetadataStorageAsync(fileName, testMetadata, userContext);
-            
-            return Ok(new { 
-                FileName = fileName, 
-                SentMetadata = testMetadata,
-                RetrievedMetadata = result,
-                Success = result.Any()
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error testing metadata for file {FileName}", fileName);
-            return StatusCode(500, "Internal server error");
-        }
-    }
 }

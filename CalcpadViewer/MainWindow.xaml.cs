@@ -185,38 +185,38 @@ public partial class MainWindow : Window
                         switch (key.ToLower())
                         {
                             case "original-filename":
-                                structuredMetadata.OriginalFileName = kvp.Value;
+                                metadata.OriginalFileName = kvp.Value;
                                 break;
                             case "date-created":
                                 if (DateTime.TryParse(kvp.Value, out var dateCreated))
-                                    structuredMetadata.DateCreated = dateCreated;
+                                    metadata.DateCreated = dateCreated;
                                 break;
                             case "date-updated":
                                 if (DateTime.TryParse(kvp.Value, out var dateUpdated))
-                                    structuredMetadata.DateUpdated = dateUpdated;
+                                    metadata.DateUpdated = dateUpdated;
                                 break;
                             case "version":
-                                structuredMetadata.Version = kvp.Value;
+                                metadata.Version = kvp.Value;
                                 break;
                             case "created-by":
-                                structuredMetadata.CreatedBy = kvp.Value;
+                                metadata.CreatedBy = kvp.Value;
                                 break;
                             case "updated-by":
-                                structuredMetadata.UpdatedBy = kvp.Value;
+                                metadata.UpdatedBy = kvp.Value;
                                 break;
                             case "date-reviewed":
                                 if (DateTime.TryParse(kvp.Value, out var dateReviewed))
-                                    structuredMetadata.DateReviewed = dateReviewed;
+                                    metadata.DateReviewed = dateReviewed;
                                 break;
                             case "reviewed-by":
-                                structuredMetadata.ReviewedBy = kvp.Value;
+                                metadata.ReviewedBy = kvp.Value;
                                 break;
                             case "tested-by":
-                                structuredMetadata.TestedBy = kvp.Value;
+                                metadata.TestedBy = kvp.Value;
                                 break;
                             case "date-tested":
                                 if (DateTime.TryParse(kvp.Value, out var dateTested))
-                                    structuredMetadata.DateTested = dateTested;
+                                    metadata.DateTested = dateTested;
                                 break;
                             default:
                                 // Add to custom metadata if not a structured field
@@ -241,9 +241,8 @@ public partial class MainWindow : Window
                 LastModified = objectStat.LastModified,
                 ContentType = objectStat.ContentType ?? "application/octet-stream",
                 ETag = objectStat.ETag ?? string.Empty,
-                CustomMetadata = customMetadata,
                 Tags = tags,
-                Structured = structuredMetadata
+                Metadata = structuredMetadata
             };
         }
         catch (Exception ex)
@@ -251,8 +250,7 @@ public partial class MainWindow : Window
             // Return basic metadata if detailed fetch fails
             return new BlobMetadata 
             { 
-                FileName = fileName,
-                CustomMetadata = new Dictionary<string, string> { { "error", ex.Message } }
+                FileName = fileName
             };
         }
     }
@@ -305,56 +303,48 @@ public partial class MainWindow : Window
         ContentTypeText.Text = metadata.ContentType;
         ETagText.Text = metadata.ETag;
 
-        // Structured Metadata - Always show section, display "None" if empty
-        var structuredItems = new List<KeyValueDisplay>();
-        if (!string.IsNullOrEmpty(metadata.Structured.OriginalFileName))
-            structuredItems.Add(new KeyValueDisplay { Key = "Original Filename", Value = metadata.Structured.OriginalFileName });
-        if (metadata.Structured.DateCreated.HasValue)
-            structuredItems.Add(new KeyValueDisplay { Key = "Date Created", Value = metadata.Structured.DateCreated.Value.ToString("yyyy-MM-dd HH:mm:ss") });
-        if (metadata.Structured.DateUpdated.HasValue)
-            structuredItems.Add(new KeyValueDisplay { Key = "Date Updated", Value = metadata.Structured.DateUpdated.Value.ToString("yyyy-MM-dd HH:mm:ss") });
-        if (!string.IsNullOrEmpty(metadata.Structured.Version))
-            structuredItems.Add(new KeyValueDisplay { Key = "Version", Value = metadata.Structured.Version });
-        if (!string.IsNullOrEmpty(metadata.Structured.CreatedBy))
-            structuredItems.Add(new KeyValueDisplay { Key = "Created By", Value = metadata.Structured.CreatedBy });
-        if (!string.IsNullOrEmpty(metadata.Structured.UpdatedBy))
-            structuredItems.Add(new KeyValueDisplay { Key = "Updated By", Value = metadata.Structured.UpdatedBy });
-        if (metadata.Structured.DateReviewed.HasValue)
-            structuredItems.Add(new KeyValueDisplay { Key = "Date Reviewed", Value = metadata.Structured.DateReviewed.Value.ToString("yyyy-MM-dd HH:mm:ss") });
-        if (!string.IsNullOrEmpty(metadata.Structured.ReviewedBy))
-            structuredItems.Add(new KeyValueDisplay { Key = "Reviewed By", Value = metadata.Structured.ReviewedBy });
-        if (!string.IsNullOrEmpty(metadata.Structured.TestedBy))
-            structuredItems.Add(new KeyValueDisplay { Key = "Tested By", Value = metadata.Structured.TestedBy });
-        if (metadata.Structured.DateTested.HasValue)
-            structuredItems.Add(new KeyValueDisplay { Key = "Date Tested", Value = metadata.Structured.DateTested.Value.ToString("yyyy-MM-dd HH:mm:ss") });
+        // All Metadata - Combined structured and custom metadata
+        var allMetadataItems = new List<KeyValueDisplay>();
+        
+        // Add structured metadata with descriptive names
+        if (!string.IsNullOrEmpty(metadata.Metadata.OriginalFileName))
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Original Filename", Value = metadata.Metadata.OriginalFileName });
+        if (metadata.Metadata.DateCreated.HasValue)
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Created", Value = metadata.Metadata.DateCreated.Value.ToString("yyyy-MM-dd HH:mm:ss") });
+        if (metadata.Metadata.DateUpdated.HasValue)
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Updated", Value = metadata.Metadata.DateUpdated.Value.ToString("yyyy-MM-dd HH:mm:ss") });
+        if (!string.IsNullOrEmpty(metadata.Metadata.Version))
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Version", Value = metadata.Metadata.Version });
+        if (!string.IsNullOrEmpty(metadata.Metadata.CreatedBy))
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Created By", Value = metadata.Metadata.CreatedBy });
+        if (!string.IsNullOrEmpty(metadata.Metadata.UpdatedBy))
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Updated By", Value = metadata.Metadata.UpdatedBy });
+        if (metadata.Metadata.DateReviewed.HasValue)
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Reviewed", Value = metadata.Metadata.DateReviewed.Value.ToString("yyyy-MM-dd HH:mm:ss") });
+        if (!string.IsNullOrEmpty(metadata.Metadata.ReviewedBy))
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Reviewed By", Value = metadata.Metadata.ReviewedBy });
+        if (!string.IsNullOrEmpty(metadata.Metadata.TestedBy))
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Tested By", Value = metadata.Metadata.TestedBy });
+        if (metadata.Metadata.DateTested.HasValue)
+            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Tested", Value = metadata.Metadata.DateTested.Value.ToString("yyyy-MM-dd HH:mm:ss") });
 
-        StructuredMetadataGroup.Visibility = Visibility.Visible;
-        if (structuredItems.Any())
+
+        // Show all metadata in the custom metadata section (rename it to just "Metadata")
+        MetadataGroup.Visibility = Visibility.Visible;
+        if (allMetadataItems.Any())
         {
-            StructuredMetadataItems.ItemsSource = structuredItems;
+            MetadataItems.ItemsSource = allMetadataItems;
         }
         else
         {
-            StructuredMetadataItems.ItemsSource = new List<KeyValueDisplay> 
+            MetadataItems.ItemsSource = new List<KeyValueDisplay> 
             { 
-                new KeyValueDisplay { Key = "Status", Value = "No structured metadata found" } 
+                new KeyValueDisplay { Key = "Status", Value = "No metadata found" } 
             };
         }
 
-        // Custom Metadata - Always show section, display "None" if empty
-        CustomMetadataGroup.Visibility = Visibility.Visible;
-        if (metadata.CustomMetadata.Any())
-        {
-            var customItems = metadata.CustomMetadata.Select(kvp => new KeyValueDisplay { Key = kvp.Key, Value = kvp.Value }).ToList();
-            CustomMetadataItems.ItemsSource = customItems;
-        }
-        else
-        {
-            CustomMetadataItems.ItemsSource = new List<KeyValueDisplay> 
-            { 
-                new KeyValueDisplay { Key = "Status", Value = "No custom metadata found" } 
-            };
-        }
+        // Hide the structured metadata section since we're combining everything
+        StructuredMetadataGroup.Visibility = Visibility.Collapsed;
 
         // Tags - Always show section, display "None" if empty
         TagsGroup.Visibility = Visibility.Visible;
@@ -376,13 +366,12 @@ public partial class MainWindow : Window
     {
         NoSelectionText.Visibility = Visibility.Visible;
         FileInfoGroup.Visibility = Visibility.Collapsed;
-        StructuredMetadataGroup.Visibility = Visibility.Visible;
-        CustomMetadataGroup.Visibility = Visibility.Visible;
+        StructuredMetadataGroup.Visibility = Visibility.Collapsed; // Always hidden now
+        MetadataGroup.Visibility = Visibility.Visible;
         TagsGroup.Visibility = Visibility.Visible;
         
         // Clear the content of metadata sections
-        StructuredMetadataItems.ItemsSource = null;
-        CustomMetadataItems.ItemsSource = null;
+        MetadataItems.ItemsSource = null;
         TagsItems.ItemsSource = null;
     }
 
@@ -416,11 +405,11 @@ public partial class MainWindow : Window
 
         if (uploadDialog.ShowDialog() == true)
         {
-            await UploadFile(uploadDialog.SelectedFilePath!, uploadDialog.CustomMetadata, uploadDialog.Tags, uploadDialog.StructuredMetadata);
+            await UploadFile(uploadDialog.SelectedFilePath!, uploadDialog.Tags, uploadDialog.Metadata);
         }
     }
 
-    private async Task UploadFile(string filePath, Dictionary<string, string> customMetadata, Dictionary<string, string> tags, StructuredMetadataRequest structuredMetadata)
+    private async Task UploadFile(string filePath, Dictionary<string, string> tags, StructuredMetadataRequest metadata)
     {
         if (_minioClient == null) return;
 
@@ -439,38 +428,29 @@ public partial class MainWindow : Window
                 .WithObjectSize(fileStream.Length)
                 .WithContentType(GetContentType(fileName));
 
-            // Add custom metadata with x-amz-meta- prefix
+            // Add structured metadata with proper x-amz-meta- prefixes
             var headers = new Dictionary<string, string>();
             
-            if (customMetadata.Any())
-            {
-                foreach (var kvp in customMetadata)
-                {
-                    headers[$"x-amz-meta-{kvp.Key.ToLower()}"] = kvp.Value;
-                }
-            }
-
-            // Add structured metadata with proper x-amz-meta- prefixes
-            if (!string.IsNullOrEmpty(structuredMetadata.OriginalFileName))
-                headers["x-amz-meta-original-filename"] = structuredMetadata.OriginalFileName;
-            if (!string.IsNullOrEmpty(structuredMetadata.Version))
-                headers["x-amz-meta-version"] = structuredMetadata.Version;
-            if (structuredMetadata.DateCreated.HasValue)
-                headers["x-amz-meta-date-created"] = structuredMetadata.DateCreated.Value.ToString("O");
-            if (structuredMetadata.DateUpdated.HasValue)
-                headers["x-amz-meta-date-updated"] = structuredMetadata.DateUpdated.Value.ToString("O");
-            if (!string.IsNullOrEmpty(structuredMetadata.CreatedBy))
-                headers["x-amz-meta-created-by"] = structuredMetadata.CreatedBy;
-            if (!string.IsNullOrEmpty(structuredMetadata.UpdatedBy))
-                headers["x-amz-meta-updated-by"] = structuredMetadata.UpdatedBy;
-            if (structuredMetadata.DateReviewed.HasValue)
-                headers["x-amz-meta-date-reviewed"] = structuredMetadata.DateReviewed.Value.ToString("O");
-            if (!string.IsNullOrEmpty(structuredMetadata.ReviewedBy))
-                headers["x-amz-meta-reviewed-by"] = structuredMetadata.ReviewedBy;
-            if (!string.IsNullOrEmpty(structuredMetadata.TestedBy))
-                headers["x-amz-meta-tested-by"] = structuredMetadata.TestedBy;
-            if (structuredMetadata.DateTested.HasValue)
-                headers["x-amz-meta-date-tested"] = structuredMetadata.DateTested.Value.ToString("O");
+            if (!string.IsNullOrEmpty(metadata.OriginalFileName))
+                headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
+            if (!string.IsNullOrEmpty(metadata.Version))
+                headers["x-amz-meta-version"] = metadata.Version;
+            if (metadata.DateCreated.HasValue)
+                headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
+            if (metadata.DateUpdated.HasValue)
+                headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
+            if (!string.IsNullOrEmpty(metadata.CreatedBy))
+                headers["x-amz-meta-created-by"] = metadata.CreatedBy;
+            if (!string.IsNullOrEmpty(metadata.UpdatedBy))
+                headers["x-amz-meta-updated-by"] = metadata.UpdatedBy;
+            if (metadata.DateReviewed.HasValue)
+                headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
+            if (!string.IsNullOrEmpty(metadata.ReviewedBy))
+                headers["x-amz-meta-reviewed-by"] = metadata.ReviewedBy;
+            if (!string.IsNullOrEmpty(metadata.TestedBy))
+                headers["x-amz-meta-tested-by"] = metadata.TestedBy;
+            if (metadata.DateTested.HasValue)
+                headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
 
             if (headers.Any())
             {

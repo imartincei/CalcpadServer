@@ -7,9 +7,8 @@ public class BlobMetadata
     public DateTime LastModified { get; set; }
     public string ContentType { get; set; } = string.Empty;
     public string ETag { get; set; } = string.Empty;
-    public Dictionary<string, string> CustomMetadata { get; set; } = new();
     public Dictionary<string, string> Tags { get; set; } = new();
-    public StructuredMetadata Structured { get; set; } = new();
+    public StructuredMetadata Metadata { get; set; } = new();
 }
 
 public class StructuredMetadata

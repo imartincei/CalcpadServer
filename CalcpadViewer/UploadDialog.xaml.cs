@@ -8,9 +8,8 @@ namespace CalcpadViewer;
 public partial class UploadDialog : Window
 {
     public string? SelectedFilePath { get; private set; }
-    public Dictionary<string, string> CustomMetadata { get; private set; } = new();
     public Dictionary<string, string> Tags { get; private set; } = new();
-    public StructuredMetadataRequest StructuredMetadata { get; private set; } = new();
+    public StructuredMetadataRequest Metadata { get; private set; } = new();
     
     public UploadDialog()
     {
@@ -55,10 +54,9 @@ public partial class UploadDialog : Window
         }
 
         // Parse structured metadata
-        StructuredMetadata = new StructuredMetadataRequest
+        Metadata = new StructuredMetadataRequest
         {
             OriginalFileName = string.IsNullOrWhiteSpace(OriginalFileNameTextBox.Text) ? null : OriginalFileNameTextBox.Text.Trim(),
-            CreatedBy = string.IsNullOrWhiteSpace(CreatedByTextBox.Text) ? null : CreatedByTextBox.Text.Trim(),
             UpdatedBy = string.IsNullOrWhiteSpace(UpdatedByTextBox.Text) ? null : UpdatedByTextBox.Text.Trim(),
             DateCreated = DateCreatedPicker.SelectedDate,
             DateUpdated = DateUpdatedPicker.SelectedDate,
@@ -68,28 +66,6 @@ public partial class UploadDialog : Window
             DateTested = DateTestedPicker.SelectedDate
         };
 
-        // Parse custom metadata
-        CustomMetadata.Clear();
-        if (!string.IsNullOrWhiteSpace(CustomMetadataTextBox.Text))
-        {
-            var lines = CustomMetadataTextBox.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var line in lines)
-            {
-                var trimmedLine = line.Trim();
-                if (string.IsNullOrEmpty(trimmedLine)) continue;
-                
-                var parts = trimmedLine.Split('=', 2);
-                if (parts.Length == 2)
-                {
-                    var key = parts[0].Trim();
-                    var value = parts[1].Trim();
-                    if (!string.IsNullOrEmpty(key) && !string.IsNullOrEmpty(value))
-                    {
-                        CustomMetadata[key] = value;
-                    }
-                }
-            }
-        }
 
         // Parse tags
         Tags.Clear();

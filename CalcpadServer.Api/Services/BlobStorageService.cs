@@ -7,10 +7,10 @@ namespace CalcpadServer.Api.Services;
 
 public interface IBlobStorageService
 {
-    Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
+    Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null);
     Task<string> UploadFileAsync(string fileName, Stream fileStream, string contentType = "application/octet-stream");
-    Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
-    Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
+    Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null);
+    Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null);
     Task<Stream> DownloadFileAsync(string fileName, UserContext userContext);
     Task<Stream> DownloadLatestVersionAsync(string baseFileName, UserContext userContext);
     Task<bool> DeleteFileAsync(string fileName, UserContext userContext);
@@ -26,7 +26,6 @@ public interface IBlobStorageService
     Task<bool> DeleteFileTagsAsync(string fileName, UserContext userContext);
     Task<int> GetNextVersionNumberAsync(string baseFileName, UserContext userContext);
     Task<string> GetVersionedFileNameAsync(string baseFileName, int version, UserContext userContext);
-    Task<Dictionary<string, string>> TestMetadataStorageAsync(string fileName, Dictionary<string, string> testMetadata, UserContext userContext);
 }
 
 public class BlobStorageService : IBlobStorageService
@@ -34,15 +33,17 @@ public class BlobStorageService : IBlobStorageService
     private readonly IMinioClient _minioClient;
     private readonly string _bucketName;
     private readonly ILogger<BlobStorageService> _logger;
+    private readonly IUserService _userService;
 
-    public BlobStorageService(IMinioClient minioClient, IConfiguration configuration, ILogger<BlobStorageService> logger)
+    public BlobStorageService(IMinioClient minioClient, IConfiguration configuration, ILogger<BlobStorageService> logger, IUserService userService)
     {
         _minioClient = minioClient;
         _bucketName = configuration["MinIO:BucketName"] ?? "calcpad-storage";
         _logger = logger;
+        _userService = userService;
     }
 
-    public async Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null)
+    public async Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null)
     {
         try
         {
@@ -58,48 +59,35 @@ public class BlobStorageService : IBlobStorageService
                 .WithObjectSize(fileStream.Length)
                 .WithContentType(contentType);
 
-            // Add custom metadata with x-amz-meta- prefix
+            // Add structured metadata
             var headers = new Dictionary<string, string>();
             
-            if (metadata != null && metadata.Any())
+            // Get user's email for CreatedBy field
+            var user = await _userService.GetUserByIdAsync(userContext.UserId);
+            var userEmail = user?.Email ?? userContext.Username; // Fallback to username if email not found
+            
+            if (metadata != null)
             {
-                foreach (var kvp in metadata)
-                {
-                    // Ensure the key doesn't already have the x-amz-meta prefix to avoid double-prefixing
-                    var metadataKey = kvp.Key.ToLower();
-                    if (!metadataKey.StartsWith("x-amz-meta-"))
-                    {
-                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
-                    }
-                    else
-                    {
-                        headers[metadataKey] = kvp.Value;
-                    }
-                }
+                if (!string.IsNullOrEmpty(metadata.OriginalFileName))
+                    headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
+                if (metadata.DateCreated.HasValue)
+                    headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
+                if (metadata.DateUpdated.HasValue)
+                    headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.UpdatedBy))
+                    headers["x-amz-meta-updated-by"] = metadata.UpdatedBy;
+                if (metadata.DateReviewed.HasValue)
+                    headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.ReviewedBy))
+                    headers["x-amz-meta-reviewed-by"] = metadata.ReviewedBy;
+                if (!string.IsNullOrEmpty(metadata.TestedBy))
+                    headers["x-amz-meta-tested-by"] = metadata.TestedBy;
+                if (metadata.DateTested.HasValue)
+                    headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
             }
-
-            // Add structured metadata
-            if (structuredMetadata != null)
-            {
-                if (!string.IsNullOrEmpty(structuredMetadata.OriginalFileName))
-                    headers["x-amz-meta-original-filename"] = structuredMetadata.OriginalFileName;
-                if (structuredMetadata.DateCreated.HasValue)
-                    headers["x-amz-meta-date-created"] = structuredMetadata.DateCreated.Value.ToString("O");
-                if (structuredMetadata.DateUpdated.HasValue)
-                    headers["x-amz-meta-date-updated"] = structuredMetadata.DateUpdated.Value.ToString("O");
-                if (!string.IsNullOrEmpty(structuredMetadata.CreatedBy))
-                    headers["x-amz-meta-created-by"] = structuredMetadata.CreatedBy;
-                if (!string.IsNullOrEmpty(structuredMetadata.UpdatedBy))
-                    headers["x-amz-meta-updated-by"] = structuredMetadata.UpdatedBy;
-                if (structuredMetadata.DateReviewed.HasValue)
-                    headers["x-amz-meta-date-reviewed"] = structuredMetadata.DateReviewed.Value.ToString("O");
-                if (!string.IsNullOrEmpty(structuredMetadata.ReviewedBy))
-                    headers["x-amz-meta-reviewed-by"] = structuredMetadata.ReviewedBy;
-                if (!string.IsNullOrEmpty(structuredMetadata.TestedBy))
-                    headers["x-amz-meta-tested-by"] = structuredMetadata.TestedBy;
-                if (structuredMetadata.DateTested.HasValue)
-                    headers["x-amz-meta-date-tested"] = structuredMetadata.DateTested.Value.ToString("O");
-            }
+            
+            // Always set CreatedBy to the logged-in user's email
+            headers["x-amz-meta-created-by"] = userEmail;
 
             // Always set version to 1 for new files
             headers["x-amz-meta-version"] = "1";
@@ -279,8 +267,7 @@ public class BlobStorageService : IBlobStorageService
             _logger.LogInformation("Retrieved metadata for file {FileName}: {Metadata}", fileName, 
                 objectStat.MetaData != null ? string.Join(", ", objectStat.MetaData.Select(m => $"{m.Key}={m.Value}")) : "No metadata");
             
-            var customMetadata = new Dictionary<string, string>();
-            var structuredMetadata = new StructuredMetadata();
+            var metadata = new StructuredMetadata();
             
             if (objectStat.MetaData != null)
             {
@@ -311,42 +298,41 @@ public class BlobStorageService : IBlobStorageService
                         switch (key.ToLower())
                         {
                             case "original-filename":
-                                structuredMetadata.OriginalFileName = kvp.Value;
+                                metadata.OriginalFileName = kvp.Value;
                                 break;
                             case "date-created":
                                 if (DateTime.TryParse(kvp.Value, out var dateCreated))
-                                    structuredMetadata.DateCreated = dateCreated;
+                                    metadata.DateCreated = dateCreated;
                                 break;
                             case "date-updated":
                                 if (DateTime.TryParse(kvp.Value, out var dateUpdated))
-                                    structuredMetadata.DateUpdated = dateUpdated;
+                                    metadata.DateUpdated = dateUpdated;
                                 break;
                             case "version":
-                                structuredMetadata.Version = kvp.Value;
+                                metadata.Version = kvp.Value;
                                 break;
                             case "created-by":
-                                structuredMetadata.CreatedBy = kvp.Value;
+                                metadata.CreatedBy = kvp.Value;
                                 break;
                             case "updated-by":
-                                structuredMetadata.UpdatedBy = kvp.Value;
+                                metadata.UpdatedBy = kvp.Value;
                                 break;
                             case "date-reviewed":
                                 if (DateTime.TryParse(kvp.Value, out var dateReviewed))
-                                    structuredMetadata.DateReviewed = dateReviewed;
+                                    metadata.DateReviewed = dateReviewed;
                                 break;
                             case "reviewed-by":
-                                structuredMetadata.ReviewedBy = kvp.Value;
+                                metadata.ReviewedBy = kvp.Value;
                                 break;
                             case "tested-by":
-                                structuredMetadata.TestedBy = kvp.Value;
+                                metadata.TestedBy = kvp.Value;
                                 break;
                             case "date-tested":
                                 if (DateTime.TryParse(kvp.Value, out var dateTested))
-                                    structuredMetadata.DateTested = dateTested;
+                                    metadata.DateTested = dateTested;
                                 break;
                             default:
-                                // Add to custom metadata if not a structured field
-                                customMetadata[key] = kvp.Value;
+                                // Ignore non-structured fields
                                 break;
                         }
                     }
@@ -360,8 +346,8 @@ public class BlobStorageService : IBlobStorageService
 
             var tags = await GetFileTagsAsync(fileName, userContext);
 
-            _logger.LogInformation("Final metadata for {FileName}: CustomMetadata={CustomCount}, StructuredVersion={Version}, StructuredOriginalFilename={OriginalFilename}", 
-                fileName, customMetadata.Count, structuredMetadata.Version, structuredMetadata.OriginalFileName);
+            _logger.LogInformation("Final metadata for {FileName}: Version={Version}, OriginalFilename={OriginalFilename}", 
+                fileName, metadata.Version, metadata.OriginalFileName);
 
             return new BlobMetadata
             {
@@ -370,9 +356,8 @@ public class BlobStorageService : IBlobStorageService
                 LastModified = objectStat.LastModified,
                 ContentType = objectStat.ContentType ?? "application/octet-stream",
                 ETag = objectStat.ETag ?? string.Empty,
-                CustomMetadata = customMetadata,
                 Tags = tags,
-                Structured = structuredMetadata
+                Metadata = metadata
             };
         }
         catch (Exception ex)
@@ -449,7 +434,7 @@ public class BlobStorageService : IBlobStorageService
         }
     }
 
-    public async Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null)
+    public async Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null)
     {
         try
         {
@@ -467,44 +452,32 @@ public class BlobStorageService : IBlobStorageService
 
             var headers = new Dictionary<string, string>();
             
-            if (metadata != null && metadata.Any())
-            {
-                foreach (var kvp in metadata)
-                {
-                    // Ensure the key doesn't already have the x-amz-meta prefix to avoid double-prefixing
-                    var metadataKey = kvp.Key.ToLower();
-                    if (!metadataKey.StartsWith("x-amz-meta-"))
-                    {
-                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
-                    }
-                    else
-                    {
-                        headers[metadataKey] = kvp.Value;
-                    }
-                }
-            }
+            // Get user's email for UpdatedBy field (for new versions)
+            var user = await _userService.GetUserByIdAsync(userContext.UserId);
+            var userEmail = user?.Email ?? userContext.Username; // Fallback to username if email not found
 
-            if (structuredMetadata != null)
+            if (metadata != null)
             {
-                if (!string.IsNullOrEmpty(structuredMetadata.OriginalFileName))
-                    headers["x-amz-meta-original-filename"] = structuredMetadata.OriginalFileName;
-                if (structuredMetadata.DateCreated.HasValue)
-                    headers["x-amz-meta-date-created"] = structuredMetadata.DateCreated.Value.ToString("O");
-                if (structuredMetadata.DateUpdated.HasValue)
-                    headers["x-amz-meta-date-updated"] = structuredMetadata.DateUpdated.Value.ToString("O");
-                if (!string.IsNullOrEmpty(structuredMetadata.CreatedBy))
-                    headers["x-amz-meta-created-by"] = structuredMetadata.CreatedBy;
-                if (!string.IsNullOrEmpty(structuredMetadata.UpdatedBy))
-                    headers["x-amz-meta-updated-by"] = structuredMetadata.UpdatedBy;
-                if (structuredMetadata.DateReviewed.HasValue)
-                    headers["x-amz-meta-date-reviewed"] = structuredMetadata.DateReviewed.Value.ToString("O");
-                if (!string.IsNullOrEmpty(structuredMetadata.ReviewedBy))
-                    headers["x-amz-meta-reviewed-by"] = structuredMetadata.ReviewedBy;
-                if (!string.IsNullOrEmpty(structuredMetadata.TestedBy))
-                    headers["x-amz-meta-tested-by"] = structuredMetadata.TestedBy;
-                if (structuredMetadata.DateTested.HasValue)
-                    headers["x-amz-meta-date-tested"] = structuredMetadata.DateTested.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.OriginalFileName))
+                    headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
+                if (metadata.DateCreated.HasValue)
+                    headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
+                if (metadata.DateUpdated.HasValue)
+                    headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.CreatedBy))
+                    headers["x-amz-meta-created-by"] = metadata.CreatedBy;
+                if (metadata.DateReviewed.HasValue)
+                    headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.ReviewedBy))
+                    headers["x-amz-meta-reviewed-by"] = metadata.ReviewedBy;
+                if (!string.IsNullOrEmpty(metadata.TestedBy))
+                    headers["x-amz-meta-tested-by"] = metadata.TestedBy;
+                if (metadata.DateTested.HasValue)
+                    headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
             }
+            
+            // Always set UpdatedBy to the current user's email (for new versions)
+            headers["x-amz-meta-updated-by"] = userEmail;
 
             headers["x-amz-meta-version"] = nextVersion.ToString();
             headers["x-amz-meta-base-filename"] = baseFileName;
@@ -534,7 +507,7 @@ public class BlobStorageService : IBlobStorageService
         }
     }
 
-    public async Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null)
+    public async Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null)
     {
         try
         {
@@ -552,44 +525,32 @@ public class BlobStorageService : IBlobStorageService
 
             var headers = new Dictionary<string, string>();
             
-            if (metadata != null && metadata.Any())
-            {
-                foreach (var kvp in metadata)
-                {
-                    // Ensure the key doesn't already have the x-amz-meta prefix to avoid double-prefixing
-                    var metadataKey = kvp.Key.ToLower();
-                    if (!metadataKey.StartsWith("x-amz-meta-"))
-                    {
-                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
-                    }
-                    else
-                    {
-                        headers[metadataKey] = kvp.Value;
-                    }
-                }
-            }
+            // Get user's email for UpdatedBy field (for new versions)
+            var user = await _userService.GetUserByIdAsync(userContext.UserId);
+            var userEmail = user?.Email ?? userContext.Username; // Fallback to username if email not found
 
-            if (structuredMetadata != null)
+            if (metadata != null)
             {
-                if (!string.IsNullOrEmpty(structuredMetadata.OriginalFileName))
-                    headers["x-amz-meta-original-filename"] = structuredMetadata.OriginalFileName;
-                if (structuredMetadata.DateCreated.HasValue)
-                    headers["x-amz-meta-date-created"] = structuredMetadata.DateCreated.Value.ToString("O");
-                if (structuredMetadata.DateUpdated.HasValue)
-                    headers["x-amz-meta-date-updated"] = structuredMetadata.DateUpdated.Value.ToString("O");
-                if (!string.IsNullOrEmpty(structuredMetadata.CreatedBy))
-                    headers["x-amz-meta-created-by"] = structuredMetadata.CreatedBy;
-                if (!string.IsNullOrEmpty(structuredMetadata.UpdatedBy))
-                    headers["x-amz-meta-updated-by"] = structuredMetadata.UpdatedBy;
-                if (structuredMetadata.DateReviewed.HasValue)
-                    headers["x-amz-meta-date-reviewed"] = structuredMetadata.DateReviewed.Value.ToString("O");
-                if (!string.IsNullOrEmpty(structuredMetadata.ReviewedBy))
-                    headers["x-amz-meta-reviewed-by"] = structuredMetadata.ReviewedBy;
-                if (!string.IsNullOrEmpty(structuredMetadata.TestedBy))
-                    headers["x-amz-meta-tested-by"] = structuredMetadata.TestedBy;
-                if (structuredMetadata.DateTested.HasValue)
-                    headers["x-amz-meta-date-tested"] = structuredMetadata.DateTested.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.OriginalFileName))
+                    headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
+                if (metadata.DateCreated.HasValue)
+                    headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
+                if (metadata.DateUpdated.HasValue)
+                    headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.CreatedBy))
+                    headers["x-amz-meta-created-by"] = metadata.CreatedBy;
+                if (metadata.DateReviewed.HasValue)
+                    headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
+                if (!string.IsNullOrEmpty(metadata.ReviewedBy))
+                    headers["x-amz-meta-reviewed-by"] = metadata.ReviewedBy;
+                if (!string.IsNullOrEmpty(metadata.TestedBy))
+                    headers["x-amz-meta-tested-by"] = metadata.TestedBy;
+                if (metadata.DateTested.HasValue)
+                    headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
             }
+            
+            // Always set UpdatedBy to the current user's email (for new versions)
+            headers["x-amz-meta-updated-by"] = userEmail;
 
             headers["x-amz-meta-version"] = nextVersion.ToString();
             headers["x-amz-meta-base-filename"] = baseFileName;
@@ -667,9 +628,8 @@ public class BlobStorageService : IBlobStorageService
         try
         {
             var allFiles = await ListFilesWithMetadataAsync(userContext);
-            var versions = allFiles.Where(f => f.Structured.OriginalFileName == baseFileName || 
-                                              f.CustomMetadata.ContainsKey("base-filename") && f.CustomMetadata["base-filename"] == baseFileName)
-                                  .OrderBy(f => int.TryParse(f.Structured.Version, out var v) ? v : 0);
+            var versions = allFiles.Where(f => f.Metadata.OriginalFileName == baseFileName)
+                                  .OrderBy(f => int.TryParse(f.Metadata.Version, out var v) ? v : 0);
             
             _logger.LogInformation("Found {Count} versions of {BaseFileName}", versions.Count(), baseFileName);
             return versions;
@@ -686,7 +646,7 @@ public class BlobStorageService : IBlobStorageService
         try
         {
             var versions = await ListFileVersionsAsync(baseFileName, userContext);
-            var latest = versions.OrderByDescending(f => int.TryParse(f.Structured.Version, out var v) ? v : 0).FirstOrDefault();
+            var latest = versions.OrderByDescending(f => int.TryParse(f.Metadata.Version, out var v) ? v : 0).FirstOrDefault();
             
             if (latest == null)
                 throw new FileNotFoundException($"No versions found for base file {baseFileName}");
@@ -707,7 +667,7 @@ public class BlobStorageService : IBlobStorageService
             var versions = await ListFileVersionsAsync(baseFileName, userContext);
             if (!versions.Any()) return 1;
             
-            var highestVersion = versions.Max(f => int.TryParse(f.Structured.Version, out var v) ? v : 0);
+            var highestVersion = versions.Max(f => int.TryParse(f.Metadata.Version, out var v) ? v : 0);
             return highestVersion + 1;
         }
         catch (Exception ex)
@@ -725,71 +685,6 @@ public class BlobStorageService : IBlobStorageService
         return await Task.FromResult($"{nameWithoutExtension}_v{version}{extension}");
     }
 
-    public async Task<Dictionary<string, string>> TestMetadataStorageAsync(string fileName, Dictionary<string, string> testMetadata, UserContext userContext)
-    {
-        try
-        {
-            _logger.LogInformation("Testing metadata storage for file {FileName}", fileName);
-            
-            // Create a small test file with metadata
-            using var testStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("Test metadata content"));
-            
-            await EnsureBucketExistsAsync();
-            
-            var putObjectArgs = new PutObjectArgs()
-                .WithBucket(_bucketName)
-                .WithObject(fileName)
-                .WithStreamData(testStream)
-                .WithObjectSize(testStream.Length)
-                .WithContentType("text/plain");
-
-            var headers = new Dictionary<string, string>();
-            
-            // Add test metadata
-            if (testMetadata != null && testMetadata.Any())
-            {
-                foreach (var kvp in testMetadata)
-                {
-                    var metadataKey = kvp.Key.ToLower();
-                    if (!metadataKey.StartsWith("x-amz-meta-"))
-                    {
-                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
-                    }
-                    else
-                    {
-                        headers[metadataKey] = kvp.Value;
-                    }
-                }
-            }
-
-            _logger.LogInformation("Setting test headers: {Headers}", string.Join(", ", headers.Select(h => $"{h.Key}={h.Value}")));
-            
-            if (headers.Any())
-            {
-                putObjectArgs.WithHeaders(headers);
-            }
-
-            await _minioClient.PutObjectAsync(putObjectArgs);
-            
-            // Now retrieve the metadata
-            var metadata = await GetFileMetadataAsync(fileName, userContext);
-            
-            var result = new Dictionary<string, string>();
-            foreach (var kvp in metadata.CustomMetadata)
-            {
-                result[kvp.Key] = kvp.Value;
-            }
-            
-            _logger.LogInformation("Retrieved test metadata: {Metadata}", string.Join(", ", result.Select(r => $"{r.Key}={r.Value}")));
-            
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error testing metadata storage for file {FileName}", fileName);
-            throw;
-        }
-    }
 
     private async Task EnsureBucketExistsAsync()
     {
