@@ -482,18 +482,8 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    var tagging = new Tagging();
-                    
-                    // Initialize Tags dictionary if it's null
-                    if (tagging.Tags == null)
-                    {
-                        tagging.Tags = new Dictionary<string, string>();
-                    }
-                    
-                    foreach (var kvp in tags)
-                    {
-                        tagging.Tags[kvp.Key] = kvp.Value;
-                    }
+                    // Try creating Tagging with tags dictionary directly
+                    var tagging = new Tagging(tags);
 
                     var setObjectTagsArgs = new SetObjectTagsArgs()
                         .WithBucket(_bucketName)
