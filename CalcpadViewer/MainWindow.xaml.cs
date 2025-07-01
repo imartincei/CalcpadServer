@@ -480,19 +480,33 @@ public partial class MainWindow : Window
             // Set tags if provided
             if (tags.Any())
             {
-                var tagging = new Tagging();
-                tagging.Tags = new Dictionary<string, string>();
-                foreach (var kvp in tags)
+                try
                 {
-                    tagging.Tags.Add(kvp.Key, kvp.Value);
+                    var tagging = new Tagging();
+                    
+                    // Initialize Tags dictionary if it's null
+                    if (tagging.Tags == null)
+                    {
+                        tagging.Tags = new Dictionary<string, string>();
+                    }
+                    
+                    foreach (var kvp in tags)
+                    {
+                        tagging.Tags[kvp.Key] = kvp.Value;
+                    }
+
+                    var setObjectTagsArgs = new SetObjectTagsArgs()
+                        .WithBucket(_bucketName)
+                        .WithObject(fileName)
+                        .WithTagging(tagging);
+
+                    await _minioClient.SetObjectTagsAsync(setObjectTagsArgs);
                 }
-
-                var setObjectTagsArgs = new SetObjectTagsArgs()
-                    .WithBucket(_bucketName)
-                    .WithObject(fileName)
-                    .WithTagging(tagging);
-
-                await _minioClient.SetObjectTagsAsync(setObjectTagsArgs);
+                catch (Exception tagEx)
+                {
+                    // If tagging fails, log but don't fail the upload
+                    StatusText.Text = $"File uploaded but tagging failed: {tagEx.Message}";
+                }
             }
             
             StatusText.Text = $"File '{fileName}' uploaded successfully";
