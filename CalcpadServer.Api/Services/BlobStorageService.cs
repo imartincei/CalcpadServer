@@ -8,7 +8,9 @@ namespace CalcpadServer.Api.Services;
 public interface IBlobStorageService
 {
     Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
+    Task<string> UploadFileAsync(string fileName, Stream fileStream, string contentType = "application/octet-stream");
     Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
+    Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null);
     Task<Stream> DownloadFileAsync(string fileName, UserContext userContext);
     Task<Stream> DownloadLatestVersionAsync(string baseFileName, UserContext userContext);
     Task<bool> DeleteFileAsync(string fileName, UserContext userContext);
@@ -24,6 +26,7 @@ public interface IBlobStorageService
     Task<bool> DeleteFileTagsAsync(string fileName, UserContext userContext);
     Task<int> GetNextVersionNumberAsync(string baseFileName, UserContext userContext);
     Task<string> GetVersionedFileNameAsync(string baseFileName, int version, UserContext userContext);
+    Task<Dictionary<string, string>> TestMetadataStorageAsync(string fileName, Dictionary<string, string> testMetadata, UserContext userContext);
 }
 
 public class BlobStorageService : IBlobStorageService
@@ -62,7 +65,16 @@ public class BlobStorageService : IBlobStorageService
             {
                 foreach (var kvp in metadata)
                 {
-                    headers[$"x-amz-meta-{kvp.Key.ToLower()}"] = kvp.Value;
+                    // Ensure the key doesn't already have the x-amz-meta prefix to avoid double-prefixing
+                    var metadataKey = kvp.Key.ToLower();
+                    if (!metadataKey.StartsWith("x-amz-meta-"))
+                    {
+                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
+                    }
+                    else
+                    {
+                        headers[metadataKey] = kvp.Value;
+                    }
                 }
             }
 
@@ -92,11 +104,13 @@ public class BlobStorageService : IBlobStorageService
             // Always set version to 1 for new files
             headers["x-amz-meta-version"] = "1";
             headers["x-amz-meta-base-filename"] = baseFileName;
+            headers["x-amz-meta-original-filename"] = baseFileName;
             headers["x-amz-meta-created-by-user-id"] = userContext.UserId;
             headers["x-amz-meta-created-by-username"] = userContext.Username;
 
             if (headers.Any())
             {
+                _logger.LogInformation("Setting headers for upload: {Headers}", string.Join(", ", headers.Select(h => $"{h.Key}={h.Value}")));
                 putObjectArgs.WithHeaders(headers);
             }
 
@@ -105,7 +119,7 @@ public class BlobStorageService : IBlobStorageService
             // Set tags if provided
             if (tags != null && tags.Any())
             {
-                await SetFileTagsAsync(versionedFileName, tags);
+                await SetFileTagsAsync(versionedFileName, tags, userContext);
             }
             
             _logger.LogInformation("File {VersionedFileName} uploaded successfully as version 1 of {BaseFileName}", versionedFileName, baseFileName);
@@ -114,6 +128,31 @@ public class BlobStorageService : IBlobStorageService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error uploading file {BaseFileName}", baseFileName);
+            throw;
+        }
+    }
+
+    public async Task<string> UploadFileAsync(string fileName, Stream fileStream, string contentType = "application/octet-stream")
+    {
+        try
+        {
+            await EnsureBucketExistsAsync();
+            
+            var putObjectArgs = new PutObjectArgs()
+                .WithBucket(_bucketName)
+                .WithObject(fileName)
+                .WithStreamData(fileStream)
+                .WithObjectSize(fileStream.Length)
+                .WithContentType(contentType);
+
+            await _minioClient.PutObjectAsync(putObjectArgs);
+            
+            _logger.LogInformation("Simple file {FileName} uploaded successfully", fileName);
+            return fileName;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading simple file {FileName}", fileName);
             throw;
         }
     }
@@ -237,6 +276,9 @@ public class BlobStorageService : IBlobStorageService
 
             var objectStat = await _minioClient.StatObjectAsync(statObjectArgs);
             
+            _logger.LogInformation("Retrieved metadata for file {FileName}: {Metadata}", fileName, 
+                objectStat.MetaData != null ? string.Join(", ", objectStat.MetaData.Select(m => $"{m.Key}={m.Value}")) : "No metadata");
+            
             var customMetadata = new Dictionary<string, string>();
             var structuredMetadata = new StructuredMetadata();
             
@@ -244,9 +286,26 @@ public class BlobStorageService : IBlobStorageService
             {
                 foreach (var kvp in objectStat.MetaData)
                 {
+                    // Handle both lowercase and capitalized versions of the x-amz-meta prefix
+                    // Also handle cases where Minio returns metadata keys without the prefix
+                    string key = null;
                     if (kvp.Key.StartsWith("x-amz-meta-", StringComparison.OrdinalIgnoreCase))
                     {
-                        var key = kvp.Key.Substring("x-amz-meta-".Length);
+                        key = kvp.Key.Substring("x-amz-meta-".Length);
+                    }
+                    else if (kvp.Key.StartsWith("X-Amz-Meta-", StringComparison.Ordinal))
+                    {
+                        key = kvp.Key.Substring("X-Amz-Meta-".Length);
+                    }
+                    else if (kvp.Key != "Content-Type" && kvp.Key != "Content-Length" && !kvp.Key.StartsWith("X-Amz-"))
+                    {
+                        // If it's not a standard HTTP header and doesn't start with X-Amz-, treat it as custom metadata
+                        key = kvp.Key;
+                    }
+                    
+                    if (key != null)
+                    {
+                        _logger.LogInformation("Processing metadata key: {OriginalKey} -> {ProcessedKey} = {Value}", kvp.Key, key, kvp.Value);
                         
                         // Parse structured metadata fields
                         switch (key.ToLower())
@@ -291,16 +350,24 @@ public class BlobStorageService : IBlobStorageService
                                 break;
                         }
                     }
+                    else
+                    {
+                        // Log non-x-amz-meta headers for debugging
+                        _logger.LogDebug("Non-metadata header found: {Key} = {Value}", kvp.Key, kvp.Value);
+                    }
                 }
             }
 
-            var tags = await GetFileTagsAsync(fileName);
+            var tags = await GetFileTagsAsync(fileName, userContext);
+
+            _logger.LogInformation("Final metadata for {FileName}: CustomMetadata={CustomCount}, StructuredVersion={Version}, StructuredOriginalFilename={OriginalFilename}", 
+                fileName, customMetadata.Count, structuredMetadata.Version, structuredMetadata.OriginalFileName);
 
             return new BlobMetadata
             {
                 FileName = fileName,
                 Size = objectStat.Size,
-                LastModified = objectStat.LastModifiedDateTime ?? DateTime.MinValue,
+                LastModified = objectStat.LastModified,
                 ContentType = objectStat.ContentType ?? "application/octet-stream",
                 ETag = objectStat.ETag ?? string.Empty,
                 CustomMetadata = customMetadata,
@@ -357,7 +424,7 @@ public class BlobStorageService : IBlobStorageService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "No tags found for file {FileName}", fileName);
+            _logger.LogInformation(ex, "Error getting tags for file {FileName}: {ErrorMessage}", fileName, ex.Message);
             return new Dictionary<string, string>();
         }
     }
@@ -404,7 +471,16 @@ public class BlobStorageService : IBlobStorageService
             {
                 foreach (var kvp in metadata)
                 {
-                    headers[$"x-amz-meta-{kvp.Key.ToLower()}"] = kvp.Value;
+                    // Ensure the key doesn't already have the x-amz-meta prefix to avoid double-prefixing
+                    var metadataKey = kvp.Key.ToLower();
+                    if (!metadataKey.StartsWith("x-amz-meta-"))
+                    {
+                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
+                    }
+                    else
+                    {
+                        headers[metadataKey] = kvp.Value;
+                    }
                 }
             }
 
@@ -432,6 +508,7 @@ public class BlobStorageService : IBlobStorageService
 
             headers["x-amz-meta-version"] = nextVersion.ToString();
             headers["x-amz-meta-base-filename"] = baseFileName;
+            headers["x-amz-meta-original-filename"] = baseFileName;
             headers["x-amz-meta-version-created-by-user-id"] = userContext.UserId;
             headers["x-amz-meta-version-created-by-username"] = userContext.Username;
 
@@ -444,11 +521,102 @@ public class BlobStorageService : IBlobStorageService
 
             if (tags != null && tags.Any())
             {
-                await SetFileTagsAsync(versionedFileName, tags);
+                await SetFileTagsAsync(versionedFileName, tags, userContext);
             }
             
             _logger.LogInformation("File {VersionedFileName} created as version {Version} of {BaseFileName}", versionedFileName, nextVersion, baseFileName);
             return versionedFileName;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating new version of file {BaseFileName}", baseFileName);
+            throw;
+        }
+    }
+
+    public async Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? metadata = null, Dictionary<string, string>? tags = null, StructuredMetadataRequest? structuredMetadata = null)
+    {
+        try
+        {
+            await EnsureBucketExistsAsync();
+            
+            var nextVersion = await GetNextVersionNumberAsync(baseFileName, userContext);
+            var versionedFileName = await GetVersionedFileNameAsync(baseFileName, nextVersion, userContext);
+            
+            var putObjectArgs = new PutObjectArgs()
+                .WithBucket(_bucketName)
+                .WithObject(versionedFileName)
+                .WithStreamData(fileStream)
+                .WithObjectSize(fileStream.Length)
+                .WithContentType(contentType);
+
+            var headers = new Dictionary<string, string>();
+            
+            if (metadata != null && metadata.Any())
+            {
+                foreach (var kvp in metadata)
+                {
+                    // Ensure the key doesn't already have the x-amz-meta prefix to avoid double-prefixing
+                    var metadataKey = kvp.Key.ToLower();
+                    if (!metadataKey.StartsWith("x-amz-meta-"))
+                    {
+                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
+                    }
+                    else
+                    {
+                        headers[metadataKey] = kvp.Value;
+                    }
+                }
+            }
+
+            if (structuredMetadata != null)
+            {
+                if (!string.IsNullOrEmpty(structuredMetadata.OriginalFileName))
+                    headers["x-amz-meta-original-filename"] = structuredMetadata.OriginalFileName;
+                if (structuredMetadata.DateCreated.HasValue)
+                    headers["x-amz-meta-date-created"] = structuredMetadata.DateCreated.Value.ToString("O");
+                if (structuredMetadata.DateUpdated.HasValue)
+                    headers["x-amz-meta-date-updated"] = structuredMetadata.DateUpdated.Value.ToString("O");
+                if (!string.IsNullOrEmpty(structuredMetadata.CreatedBy))
+                    headers["x-amz-meta-created-by"] = structuredMetadata.CreatedBy;
+                if (!string.IsNullOrEmpty(structuredMetadata.UpdatedBy))
+                    headers["x-amz-meta-updated-by"] = structuredMetadata.UpdatedBy;
+                if (structuredMetadata.DateReviewed.HasValue)
+                    headers["x-amz-meta-date-reviewed"] = structuredMetadata.DateReviewed.Value.ToString("O");
+                if (!string.IsNullOrEmpty(structuredMetadata.ReviewedBy))
+                    headers["x-amz-meta-reviewed-by"] = structuredMetadata.ReviewedBy;
+                if (!string.IsNullOrEmpty(structuredMetadata.TestedBy))
+                    headers["x-amz-meta-tested-by"] = structuredMetadata.TestedBy;
+                if (structuredMetadata.DateTested.HasValue)
+                    headers["x-amz-meta-date-tested"] = structuredMetadata.DateTested.Value.ToString("O");
+            }
+
+            headers["x-amz-meta-version"] = nextVersion.ToString();
+            headers["x-amz-meta-base-filename"] = baseFileName;
+            headers["x-amz-meta-original-filename"] = baseFileName;
+            headers["x-amz-meta-version-created-by-user-id"] = userContext.UserId;
+            headers["x-amz-meta-version-created-by-username"] = userContext.Username;
+
+            if (headers.Any())
+            {
+                putObjectArgs.WithHeaders(headers);
+            }
+
+            await _minioClient.PutObjectAsync(putObjectArgs);
+
+            if (tags != null && tags.Any())
+            {
+                await SetFileTagsAsync(versionedFileName, tags, userContext);
+            }
+            
+            _logger.LogInformation("File {VersionedFileName} created as version {Version} of {BaseFileName}", versionedFileName, nextVersion, baseFileName);
+            
+            return new VersionCreationResult
+            {
+                VersionedFileName = versionedFileName,
+                Version = nextVersion,
+                BaseFileName = baseFileName
+            };
         }
         catch (Exception ex)
         {
@@ -555,6 +723,72 @@ public class BlobStorageService : IBlobStorageService
         var extension = Path.GetExtension(baseFileName);
         var nameWithoutExtension = Path.GetFileNameWithoutExtension(baseFileName);
         return await Task.FromResult($"{nameWithoutExtension}_v{version}{extension}");
+    }
+
+    public async Task<Dictionary<string, string>> TestMetadataStorageAsync(string fileName, Dictionary<string, string> testMetadata, UserContext userContext)
+    {
+        try
+        {
+            _logger.LogInformation("Testing metadata storage for file {FileName}", fileName);
+            
+            // Create a small test file with metadata
+            using var testStream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("Test metadata content"));
+            
+            await EnsureBucketExistsAsync();
+            
+            var putObjectArgs = new PutObjectArgs()
+                .WithBucket(_bucketName)
+                .WithObject(fileName)
+                .WithStreamData(testStream)
+                .WithObjectSize(testStream.Length)
+                .WithContentType("text/plain");
+
+            var headers = new Dictionary<string, string>();
+            
+            // Add test metadata
+            if (testMetadata != null && testMetadata.Any())
+            {
+                foreach (var kvp in testMetadata)
+                {
+                    var metadataKey = kvp.Key.ToLower();
+                    if (!metadataKey.StartsWith("x-amz-meta-"))
+                    {
+                        headers[$"x-amz-meta-{metadataKey}"] = kvp.Value;
+                    }
+                    else
+                    {
+                        headers[metadataKey] = kvp.Value;
+                    }
+                }
+            }
+
+            _logger.LogInformation("Setting test headers: {Headers}", string.Join(", ", headers.Select(h => $"{h.Key}={h.Value}")));
+            
+            if (headers.Any())
+            {
+                putObjectArgs.WithHeaders(headers);
+            }
+
+            await _minioClient.PutObjectAsync(putObjectArgs);
+            
+            // Now retrieve the metadata
+            var metadata = await GetFileMetadataAsync(fileName, userContext);
+            
+            var result = new Dictionary<string, string>();
+            foreach (var kvp in metadata.CustomMetadata)
+            {
+                result[kvp.Key] = kvp.Value;
+            }
+            
+            _logger.LogInformation("Retrieved test metadata: {Metadata}", string.Join(", ", result.Select(r => $"{r.Key}={r.Value}")));
+            
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error testing metadata storage for file {FileName}", fileName);
+            throw;
+        }
     }
 
     private async Task EnsureBucketExistsAsync()
