@@ -482,8 +482,8 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    // Try creating Tagging with tags dictionary directly
-                    var tagging = new Tagging(tags);
+                    // Create Tagging with tags dictionary (false = bucket tags, true = object tags)
+                    var tagging = new Tagging(tags, true);
 
                     var setObjectTagsArgs = new SetObjectTagsArgs()
                         .WithBucket(_bucketName)
