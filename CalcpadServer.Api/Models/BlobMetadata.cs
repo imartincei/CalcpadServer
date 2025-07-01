@@ -63,3 +63,10 @@ public class StructuredMetadataUpdateRequest
 {
     public StructuredMetadataRequest StructuredMetadata { get; set; } = new();
 }
+
+public class VersionCreationResult
+{
+    public string VersionedFileName { get; set; } = string.Empty;
+    public int Version { get; set; }
+    public string BaseFileName { get; set; } = string.Empty;
+}
