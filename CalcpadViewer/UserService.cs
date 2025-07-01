@@ -7,10 +7,12 @@ namespace CalcpadViewer.Services;
 
 public interface IUserService
 {
+    Task<AuthResponse> LoginAsync(string username, string password);
     Task<List<User>> GetAllUsersAsync();
     Task<User> CreateUserAsync(RegisterRequest request);
     Task<User> UpdateUserAsync(string userId, UpdateUserRequest request);
     Task<bool> DeleteUserAsync(string userId);
+    void SetAuthToken(string token);
 }
 
 public class UserService : IUserService
@@ -18,6 +20,7 @@ public class UserService : IUserService
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
     private readonly JsonSerializerOptions _jsonOptions;
+    private string? _authToken;
 
     public UserService(string baseUrl)
     {
@@ -27,6 +30,45 @@ public class UserService : IUserService
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
+    }
+
+    public void SetAuthToken(string token)
+    {
+        _authToken = token;
+        _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+    }
+
+    public async Task<AuthResponse> LoginAsync(string username, string password)
+    {
+        try
+        {
+            var loginRequest = new LoginRequest
+            {
+                Username = username,
+                Password = password
+            };
+            
+            var json = JsonSerializer.Serialize(loginRequest, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/auth/login", content);
+            response.EnsureSuccessStatusCode();
+            
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var authResponse = JsonSerializer.Deserialize<AuthResponse>(responseJson, _jsonOptions);
+            
+            if (authResponse != null)
+            {
+                SetAuthToken(authResponse.Token);
+            }
+            
+            return authResponse ?? throw new Exception("Invalid response from server");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to login: {ex.Message}", ex);
+        }
     }
 
     public async Task<List<User>> GetAllUsersAsync()

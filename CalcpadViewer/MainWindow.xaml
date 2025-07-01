@@ -10,7 +10,7 @@
         </Grid.RowDefinitions>
         
         <!-- Connection Panel -->
-        <GroupBox Header="MinIO Connection" Grid.Row="0" Margin="10">
+        <GroupBox Header="Connection Settings" Grid.Row="0" Margin="10">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -22,8 +22,10 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 
+                <!-- MinIO Settings -->
                 <Label Grid.Row="0" Grid.Column="0" Content="Endpoint:" VerticalAlignment="Center"/>
                 <TextBox x:Name="EndpointTextBox" Grid.Row="0" Grid.Column="1" Margin="5" Text="localhost:9000"/>
                 
@@ -41,6 +43,13 @@
                 
                 <CheckBox x:Name="UseSSLCheckBox" Grid.Row="1" Grid.Column="4" Content="Use SSL" 
                           VerticalAlignment="Center" Margin="10,0,0,0"/>
+                
+                <!-- Admin Login -->
+                <Label Grid.Row="2" Grid.Column="0" Content="Admin User:" VerticalAlignment="Center"/>
+                <TextBox x:Name="AdminUsernameTextBox" Grid.Row="2" Grid.Column="1" Margin="5" Text="admin"/>
+                
+                <Label Grid.Row="2" Grid.Column="2" Content="Admin Password:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                <PasswordBox x:Name="AdminPasswordBox" Grid.Row="2" Grid.Column="3" Margin="5"/>
             </Grid>
         </GroupBox>
         
@@ -68,6 +77,8 @@
                                         Margin="5" Padding="5" Click="RefreshButton_Click"/>
                                 <Button x:Name="UploadButton" Content="Upload File" 
                                         Margin="0,5,5,5" Padding="5" Click="UploadButton_Click" IsEnabled="False"/>
+                                <Button x:Name="DownloadButton" Content="Download File" 
+                                        Margin="0,5,5,5" Padding="5" Click="DownloadButton_Click" IsEnabled="False"/>
                             </StackPanel>
                             
                             <ListBox x:Name="FilesListBox" Grid.Row="1" Margin="5" 

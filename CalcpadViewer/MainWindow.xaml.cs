@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         SecretKeyBox.Password = "calcpad-password-123"; // Default password
+        AdminPasswordBox.Password = "admin123"; // Default admin password
         InitializeUserRoleComboBox();
     }
 
@@ -71,11 +72,35 @@ public partial class MainWindow : Window
             StatusText.Text = "Connected successfully";
             RefreshButton.IsEnabled = true;
             UploadButton.IsEnabled = true;
+            DownloadButton.IsEnabled = true;
             
-            // Initialize user service and enable admin tab
+            // Initialize user service and try admin login
             var apiBaseUrl = $"http{(useSSL ? "s" : "")}://{endpoint.Replace(":9000", ":5159")}"; // API is on port 5159
             _userService = new UserService(apiBaseUrl);
-            AdminTab.IsEnabled = true;
+            
+            // Attempt admin login if credentials provided
+            var adminUsername = AdminUsernameTextBox.Text.Trim();
+            var adminPassword = AdminPasswordBox.Password.Trim();
+            
+            if (!string.IsNullOrEmpty(adminUsername) && !string.IsNullOrEmpty(adminPassword))
+            {
+                try
+                {
+                    StatusText.Text = "Logging in admin user...";
+                    var authResponse = await _userService.LoginAsync(adminUsername, adminPassword);
+                    StatusText.Text = $"Admin logged in: {authResponse.User.Username}";
+                    AdminTab.IsEnabled = true;
+                }
+                catch (Exception authEx)
+                {
+                    MessageBox.Show($"Admin login failed: {authEx.Message}", "Login Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    StatusText.Text = "Connected (no admin access)";
+                }
+            }
+            else
+            {
+                StatusText.Text = "Connected (no admin credentials)";
+            }
             
             await LoadFiles();
         }
@@ -695,5 +720,62 @@ public partial class MainWindow : Window
         UserDetailsGroup.Visibility = Visibility.Collapsed;
         UserActionsGroup.Visibility = Visibility.Collapsed;
         _selectedUser = null;
+    }
+
+    private async void DownloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (FilesListBox.SelectedItem is not string selectedFileName)
+        {
+            MessageBox.Show("Please select a file to download.", "No File Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            StatusText.Text = "Downloading file...";
+            DownloadButton.IsEnabled = false;
+
+            // Show save file dialog
+            var saveFileDialog = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = selectedFileName,
+                Title = "Save File As",
+                Filter = "All Files (*.*)|*.*"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                await DownloadFile(selectedFileName, saveFileDialog.FileName);
+                MessageBox.Show($"File downloaded successfully to:\n{saveFileDialog.FileName}", "Download Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusText.Text = "Download completed";
+            }
+            else
+            {
+                StatusText.Text = "Download cancelled";
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to download file: {ex.Message}", "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Download failed";
+        }
+        finally
+        {
+            DownloadButton.IsEnabled = true;
+        }
+    }
+
+    private async Task DownloadFile(string fileName, string localFilePath)
+    {
+        var getObjectArgs = new GetObjectArgs()
+            .WithBucket(_bucketName)
+            .WithObject(fileName)
+            .WithCallbackStream(stream =>
+            {
+                using var fileStream = File.Create(localFilePath);
+                stream.CopyTo(fileStream);
+            });
+
+        await _minioClient.GetObjectAsync(getObjectArgs);
     }
 }
