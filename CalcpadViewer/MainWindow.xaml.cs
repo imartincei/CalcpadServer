@@ -176,57 +176,7 @@ public partial class MainWindow : Window
             {
                 foreach (var kvp in objectStat.MetaData)
                 {
-                    // Process all metadata, including system metadata
-                    if (kvp.Key.StartsWith("x-amz-meta-", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var key = kvp.Key.Substring("x-amz-meta-".Length);
-
-                        // Parse structured metadata fields
-                        switch (key.ToLower())
-                        {
-                            case "original-filename":
-                                Metadata.OriginalFileName = kvp.Value;
-                                break;
-                            case "date-created":
-                                if (DateTime.TryParse(kvp.Value, out var dateCreated))
-                                    Metadata.DateCreated = dateCreated;
-                                break;
-                            case "date-updated":
-                                if (DateTime.TryParse(kvp.Value, out var dateUpdated))
-                                    Metadata.DateUpdated = dateUpdated;
-                                break;
-                            case "version":
-                                Metadata.Version = kvp.Value;
-                                break;
-                            case "created-by":
-                                Metadata.CreatedBy = kvp.Value;
-                                break;
-                            case "updated-by":
-                                Metadata.UpdatedBy = kvp.Value;
-                                break;
-                            case "date-reviewed":
-                                if (DateTime.TryParse(kvp.Value, out var dateReviewed))
-                                    Metadata.DateReviewed = dateReviewed;
-                                break;
-                            case "reviewed-by":
-                                Metadata.ReviewedBy = kvp.Value;
-                                break;
-                            case "tested-by":
-                                Metadata.TestedBy = kvp.Value;
-                                break;
-                            case "date-tested":
-                                if (DateTime.TryParse(kvp.Value, out var dateTested))
-                                    Metadata.DateTested = dateTested;
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        // Add system metadata (non user-defined) to custom metadata for visibility
-                        customMetadata[$"[System] {kvp.Key}"] = kvp.Value;
-                    }
+                    customMetadata[kvp.Key] = kvp.Value;
                 }
             }
 
