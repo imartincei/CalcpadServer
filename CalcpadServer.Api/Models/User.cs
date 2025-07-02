@@ -3,7 +3,7 @@ namespace CalcpadServer.Api.Models;
 public enum UserRole
 {
     Viewer = 1,      // Read-only access to all files and metadata
-    Contributor = 2, // Can read files, add new versions, update metadata  
+    Contributor = 2, // Can read files, update metadata  
     Admin = 3        // Full control: delete files, manage users, update roles
 }
 

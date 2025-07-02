@@ -8,53 +8,33 @@ namespace CalcpadServer.Api.Services;
 public interface IBlobStorageService
 {
     Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null);
-    Task<string> UploadFileAsync(string fileName, Stream fileStream, string contentType = "application/octet-stream");
-    Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null);
-    Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null);
     Task<Stream> DownloadFileAsync(string fileName, UserContext userContext);
-    Task<Stream> DownloadLatestVersionAsync(string baseFileName, UserContext userContext);
     Task<bool> DeleteFileAsync(string fileName, UserContext userContext);
-    Task<bool> DeleteAllVersionsAsync(string baseFileName, UserContext userContext);
     Task<IEnumerable<string>> ListFilesAsync(UserContext userContext);
     Task<IEnumerable<BlobMetadata>> ListFilesWithMetadataAsync(UserContext userContext);
-    Task<IEnumerable<BlobMetadata>> ListFileVersionsAsync(string baseFileName, UserContext userContext);
     Task<bool> FileExistsAsync(string fileName, UserContext userContext);
     Task<BlobMetadata> GetFileMetadataAsync(string fileName, UserContext userContext);
-    Task<BlobMetadata> GetLatestVersionMetadataAsync(string baseFileName, UserContext userContext);
     Task<bool> SetFileTagsAsync(string fileName, Dictionary<string, string> tags, UserContext userContext);
     Task<Dictionary<string, string>> GetFileTagsAsync(string fileName, UserContext userContext);
     Task<bool> DeleteFileTagsAsync(string fileName, UserContext userContext);
-    Task<int> GetNextVersionNumberAsync(string baseFileName, UserContext userContext);
-    Task<string> GetVersionedFileNameAsync(string baseFileName, int version, UserContext userContext);
 }
 
-public class BlobStorageService : IBlobStorageService
+public class BlobStorageService(IMinioClient minioClient, IConfiguration configuration, ILogger<BlobStorageService> logger, IUserService userService) : IBlobStorageService
 {
-    private readonly IMinioClient _minioClient;
-    private readonly string _bucketName;
-    private readonly ILogger<BlobStorageService> _logger;
-    private readonly IUserService _userService;
+    private readonly IMinioClient _minioClient = minioClient;
+    private readonly string _bucketName = configuration["MinIO:BucketName"] ?? "calcpad-storage-working";
+    private readonly ILogger<BlobStorageService> _logger = logger;
+    private readonly IUserService _userService = userService;
 
-    public BlobStorageService(IMinioClient minioClient, IConfiguration configuration, ILogger<BlobStorageService> logger, IUserService userService)
-    {
-        _minioClient = minioClient;
-        _bucketName = configuration["MinIO:BucketName"] ?? "calcpad-storage";
-        _logger = logger;
-        _userService = userService;
-    }
-
-    public async Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
+    public async Task<string> UploadFileAsync(string FileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
     {
         try
         {
             await EnsureBucketExistsAsync();
             
-            // Create version 1 for new file
-            var versionedFileName = await GetVersionedFileNameAsync(baseFileName, 1, userContext);
-            
             var putObjectArgs = new PutObjectArgs()
                 .WithBucket(_bucketName)
-                .WithObject(versionedFileName)
+                .WithObject(FileName)
                 .WithStreamData(fileStream)
                 .WithObjectSize(fileStream.Length)
                 .WithContentType(contentType);
@@ -86,14 +66,10 @@ public class BlobStorageService : IBlobStorageService
             
             // Always set CreatedBy to the logged-in user's email
             headers["x-amz-meta-created-by"] = userEmail;
-
-            // Always set version to 1 for new files
-            headers["x-amz-meta-version"] = "1";
-            headers["x-amz-meta-base-filename"] = baseFileName;
             headers["x-amz-meta-created-by-user-id"] = userContext.UserId;
             headers["x-amz-meta-created-by-username"] = userContext.Username;
 
-            if (headers.Any())
+            if (headers.Count != 0)
             {
                 _logger.LogInformation("Setting headers for upload: {Headers}", string.Join(", ", headers.Select(h => $"{h.Key}={h.Value}")));
                 putObjectArgs.WithHeaders(headers);
@@ -102,17 +78,17 @@ public class BlobStorageService : IBlobStorageService
             await _minioClient.PutObjectAsync(putObjectArgs);
 
             // Set tags if provided
-            if (tags != null && tags.Any())
+            if (tags != null && tags.Count != 0)
             {
-                await SetFileTagsAsync(versionedFileName, tags, userContext);
+                await SetFileTagsAsync(FileName, tags, userContext);
             }
             
-            _logger.LogInformation("File {VersionedFileName} uploaded successfully as version 1 of {BaseFileName}", versionedFileName, baseFileName);
-            return versionedFileName;
+            _logger.LogInformation("File {FileName} uploaded successfully", FileName);
+            return FileName;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error uploading file {BaseFileName}", baseFileName);
+            _logger.LogError(ex, "Error uploading file {FileName}", FileName);
             throw;
         }
     }
@@ -270,40 +246,17 @@ public class BlobStorageService : IBlobStorageService
             {
                 foreach (var kvp in objectStat.MetaData)
                 {
-                    // Handle both lowercase and capitalized versions of the x-amz-meta prefix
-                    // Also handle cases where Minio returns metadata keys without the prefix
-                    string key = null;
-                    if (kvp.Key.StartsWith("x-amz-meta-", StringComparison.OrdinalIgnoreCase))
-                    {
-                        key = kvp.Key.Substring("x-amz-meta-".Length);
-                    }
-                    else if (kvp.Key.StartsWith("X-Amz-Meta-", StringComparison.Ordinal))
-                    {
-                        key = kvp.Key.Substring("X-Amz-Meta-".Length);
-                    }
-                    else if (kvp.Key != "Content-Type" && kvp.Key != "Content-Length" && !kvp.Key.StartsWith("X-Amz-"))
-                    {
-                        // If it's not a standard HTTP header and doesn't start with X-Amz-, treat it as custom metadata
-                        key = kvp.Key;
-                    }
                     
-                    if (key != null)
+                    if (kvp.Key != null)
                     {
-                        _logger.LogInformation("Processing metadata key: {OriginalKey} -> {ProcessedKey} = {Value}", kvp.Key, key, kvp.Value);
+                        _logger.LogInformation("Processing metadata key: {OriginalKey} = {Value}", kvp.Key, kvp.Value);
                         
                         // Parse structured metadata fields
-                        switch (key.ToLower())
+                        switch (kvp.Key.ToLower())
                         {
                             case "date-created":
                                 if (DateTime.TryParse(kvp.Value, out var dateCreated))
                                     metadata.DateCreated = dateCreated;
-                                break;
-                            case "date-updated":
-                                if (DateTime.TryParse(kvp.Value, out var dateUpdated))
-                                    metadata.DateUpdated = dateUpdated;
-                                break;
-                            case "version":
-                                metadata.Version = kvp.Value;
                                 break;
                             case "created-by":
                                 metadata.CreatedBy = kvp.Value;
@@ -330,18 +283,13 @@ public class BlobStorageService : IBlobStorageService
                                 break;
                         }
                     }
-                    else
-                    {
-                        // Log non-x-amz-meta headers for debugging
-                        _logger.LogDebug("Non-metadata header found: {Key} = {Value}", kvp.Key, kvp.Value);
-                    }
                 }
             }
 
             var tags = await GetFileTagsAsync(fileName, userContext);
 
-            _logger.LogInformation("Final metadata for {FileName}: Version={Version}", 
-                fileName, metadata.Version);
+            _logger.LogInformation("Final metadata for {FileName}", 
+                fileName);
 
             return new BlobMetadata
             {
@@ -427,15 +375,6 @@ public class BlobStorageService : IBlobStorageService
             return false;
         }
     }
-
-
-
-
-
-
-
-
-
 
     private async Task EnsureBucketExistsAsync()
     {

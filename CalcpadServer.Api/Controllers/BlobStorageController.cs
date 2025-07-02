@@ -41,33 +41,11 @@ public class BlobStorageController : ControllerBase
                 request.Tags,
                 request.Metadata);
             
-            return Ok(new { VersionedFileName = fileName, Message = "File uploaded successfully as version 1", BaseFileName = request.File.FileName, Version = 1 });
+            return Ok(new { FileName = fileName, Message = "File uploaded successfully"});
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error uploading file {FileName}", request.File.FileName);
-            return StatusCode(500, "Internal server error");
-        }
-    }
-
-    [HttpPost("upload-simple")]
-    public async Task<IActionResult> UploadFileSimple(IFormFile file)
-    {
-        if (file == null || file.Length == 0)
-        {
-            return BadRequest("No file provided");
-        }
-
-        try
-        {
-            using var stream = file.OpenReadStream();
-            var fileName = await _blobStorageService.UploadFileAsync(file.FileName, stream, file.ContentType);
-            
-            return Ok(new { FileName = fileName, Message = "File uploaded successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error uploading file {FileName}", file.FileName);
             return StatusCode(500, "Internal server error");
         }
     }
