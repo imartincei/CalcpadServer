@@ -68,8 +68,6 @@ public class BlobStorageService : IBlobStorageService
             
             if (metadata != null)
             {
-                if (!string.IsNullOrEmpty(metadata.OriginalFileName))
-                    headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
                 if (metadata.DateCreated.HasValue)
                     headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
                 if (metadata.DateUpdated.HasValue)
@@ -92,7 +90,6 @@ public class BlobStorageService : IBlobStorageService
             // Always set version to 1 for new files
             headers["x-amz-meta-version"] = "1";
             headers["x-amz-meta-base-filename"] = baseFileName;
-            headers["x-amz-meta-original-filename"] = baseFileName;
             headers["x-amz-meta-created-by-user-id"] = userContext.UserId;
             headers["x-amz-meta-created-by-username"] = userContext.Username;
 
@@ -297,9 +294,6 @@ public class BlobStorageService : IBlobStorageService
                         // Parse structured metadata fields
                         switch (key.ToLower())
                         {
-                            case "original-filename":
-                                metadata.OriginalFileName = kvp.Value;
-                                break;
                             case "date-created":
                                 if (DateTime.TryParse(kvp.Value, out var dateCreated))
                                     metadata.DateCreated = dateCreated;
@@ -346,8 +340,8 @@ public class BlobStorageService : IBlobStorageService
 
             var tags = await GetFileTagsAsync(fileName, userContext);
 
-            _logger.LogInformation("Final metadata for {FileName}: Version={Version}, OriginalFilename={OriginalFilename}", 
-                fileName, metadata.Version, metadata.OriginalFileName);
+            _logger.LogInformation("Final metadata for {FileName}: Version={Version}", 
+                fileName, metadata.Version);
 
             return new BlobMetadata
             {
@@ -434,256 +428,13 @@ public class BlobStorageService : IBlobStorageService
         }
     }
 
-    public async Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
-    {
-        try
-        {
-            await EnsureBucketExistsAsync();
-            
-            var nextVersion = await GetNextVersionNumberAsync(baseFileName, userContext);
-            var versionedFileName = await GetVersionedFileNameAsync(baseFileName, nextVersion, userContext);
-            
-            var putObjectArgs = new PutObjectArgs()
-                .WithBucket(_bucketName)
-                .WithObject(versionedFileName)
-                .WithStreamData(fileStream)
-                .WithObjectSize(fileStream.Length)
-                .WithContentType(contentType);
 
-            var headers = new Dictionary<string, string>();
-            
-            // Get user's email for UpdatedBy field (for new versions)
-            var user = await _userService.GetUserByIdAsync(userContext.UserId);
-            var userEmail = user?.Email ?? userContext.Username; // Fallback to username if email not found
 
-            if (metadata != null)
-            {
-                if (!string.IsNullOrEmpty(metadata.OriginalFileName))
-                    headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
-                if (metadata.DateCreated.HasValue)
-                    headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
-                if (metadata.DateUpdated.HasValue)
-                    headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
-                if (!string.IsNullOrEmpty(metadata.CreatedBy))
-                    headers["x-amz-meta-created-by"] = metadata.CreatedBy;
-                if (metadata.DateReviewed.HasValue)
-                    headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
-                if (!string.IsNullOrEmpty(metadata.ReviewedBy))
-                    headers["x-amz-meta-reviewed-by"] = metadata.ReviewedBy;
-                if (!string.IsNullOrEmpty(metadata.TestedBy))
-                    headers["x-amz-meta-tested-by"] = metadata.TestedBy;
-                if (metadata.DateTested.HasValue)
-                    headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
-            }
-            
-            // Always set UpdatedBy to the current user's email (for new versions)
-            headers["x-amz-meta-updated-by"] = userEmail;
 
-            headers["x-amz-meta-version"] = nextVersion.ToString();
-            headers["x-amz-meta-base-filename"] = baseFileName;
-            headers["x-amz-meta-original-filename"] = baseFileName;
-            headers["x-amz-meta-version-created-by-user-id"] = userContext.UserId;
-            headers["x-amz-meta-version-created-by-username"] = userContext.Username;
 
-            if (headers.Any())
-            {
-                putObjectArgs.WithHeaders(headers);
-            }
 
-            await _minioClient.PutObjectAsync(putObjectArgs);
 
-            if (tags != null && tags.Any())
-            {
-                await SetFileTagsAsync(versionedFileName, tags, userContext);
-            }
-            
-            _logger.LogInformation("File {VersionedFileName} created as version {Version} of {BaseFileName}", versionedFileName, nextVersion, baseFileName);
-            return versionedFileName;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating new version of file {BaseFileName}", baseFileName);
-            throw;
-        }
-    }
 
-    public async Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
-    {
-        try
-        {
-            await EnsureBucketExistsAsync();
-            
-            var nextVersion = await GetNextVersionNumberAsync(baseFileName, userContext);
-            var versionedFileName = await GetVersionedFileNameAsync(baseFileName, nextVersion, userContext);
-            
-            var putObjectArgs = new PutObjectArgs()
-                .WithBucket(_bucketName)
-                .WithObject(versionedFileName)
-                .WithStreamData(fileStream)
-                .WithObjectSize(fileStream.Length)
-                .WithContentType(contentType);
-
-            var headers = new Dictionary<string, string>();
-            
-            // Get user's email for UpdatedBy field (for new versions)
-            var user = await _userService.GetUserByIdAsync(userContext.UserId);
-            var userEmail = user?.Email ?? userContext.Username; // Fallback to username if email not found
-
-            if (metadata != null)
-            {
-                if (!string.IsNullOrEmpty(metadata.OriginalFileName))
-                    headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
-                if (metadata.DateCreated.HasValue)
-                    headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
-                if (metadata.DateUpdated.HasValue)
-                    headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
-                if (!string.IsNullOrEmpty(metadata.CreatedBy))
-                    headers["x-amz-meta-created-by"] = metadata.CreatedBy;
-                if (metadata.DateReviewed.HasValue)
-                    headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
-                if (!string.IsNullOrEmpty(metadata.ReviewedBy))
-                    headers["x-amz-meta-reviewed-by"] = metadata.ReviewedBy;
-                if (!string.IsNullOrEmpty(metadata.TestedBy))
-                    headers["x-amz-meta-tested-by"] = metadata.TestedBy;
-                if (metadata.DateTested.HasValue)
-                    headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
-            }
-            
-            // Always set UpdatedBy to the current user's email (for new versions)
-            headers["x-amz-meta-updated-by"] = userEmail;
-
-            headers["x-amz-meta-version"] = nextVersion.ToString();
-            headers["x-amz-meta-base-filename"] = baseFileName;
-            headers["x-amz-meta-original-filename"] = baseFileName;
-            headers["x-amz-meta-version-created-by-user-id"] = userContext.UserId;
-            headers["x-amz-meta-version-created-by-username"] = userContext.Username;
-
-            if (headers.Any())
-            {
-                putObjectArgs.WithHeaders(headers);
-            }
-
-            await _minioClient.PutObjectAsync(putObjectArgs);
-
-            if (tags != null && tags.Any())
-            {
-                await SetFileTagsAsync(versionedFileName, tags, userContext);
-            }
-            
-            _logger.LogInformation("File {VersionedFileName} created as version {Version} of {BaseFileName}", versionedFileName, nextVersion, baseFileName);
-            
-            return new VersionCreationResult
-            {
-                VersionedFileName = versionedFileName,
-                Version = nextVersion,
-                BaseFileName = baseFileName
-            };
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating new version of file {BaseFileName}", baseFileName);
-            throw;
-        }
-    }
-
-    public async Task<Stream> DownloadLatestVersionAsync(string baseFileName, UserContext userContext)
-    {
-        try
-        {
-            var latestVersion = await GetLatestVersionMetadataAsync(baseFileName, userContext);
-            return await DownloadFileAsync(latestVersion.FileName, userContext);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error downloading latest version of {BaseFileName}", baseFileName);
-            throw;
-        }
-    }
-
-    public async Task<bool> DeleteAllVersionsAsync(string baseFileName, UserContext userContext)
-    {
-        try
-        {
-            var versions = await ListFileVersionsAsync(baseFileName, userContext);
-            var success = true;
-            
-            foreach (var version in versions)
-            {
-                var deleted = await DeleteFileAsync(version.FileName, userContext);
-                if (!deleted) success = false;
-            }
-            
-            _logger.LogInformation("All versions of {BaseFileName} deletion completed. Success: {Success}", baseFileName, success);
-            return success;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting all versions of {BaseFileName}", baseFileName);
-            return false;
-        }
-    }
-
-    public async Task<IEnumerable<BlobMetadata>> ListFileVersionsAsync(string baseFileName, UserContext userContext)
-    {
-        try
-        {
-            var allFiles = await ListFilesWithMetadataAsync(userContext);
-            var versions = allFiles.Where(f => f.Metadata.OriginalFileName == baseFileName)
-                                  .OrderBy(f => int.TryParse(f.Metadata.Version, out var v) ? v : 0);
-            
-            _logger.LogInformation("Found {Count} versions of {BaseFileName}", versions.Count(), baseFileName);
-            return versions;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error listing versions of {BaseFileName}", baseFileName);
-            throw;
-        }
-    }
-
-    public async Task<BlobMetadata> GetLatestVersionMetadataAsync(string baseFileName, UserContext userContext)
-    {
-        try
-        {
-            var versions = await ListFileVersionsAsync(baseFileName, userContext);
-            var latest = versions.OrderByDescending(f => int.TryParse(f.Metadata.Version, out var v) ? v : 0).FirstOrDefault();
-            
-            if (latest == null)
-                throw new FileNotFoundException($"No versions found for base file {baseFileName}");
-                
-            return latest;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting latest version of {BaseFileName}", baseFileName);
-            throw;
-        }
-    }
-
-    public async Task<int> GetNextVersionNumberAsync(string baseFileName, UserContext userContext)
-    {
-        try
-        {
-            var versions = await ListFileVersionsAsync(baseFileName, userContext);
-            if (!versions.Any()) return 1;
-            
-            var highestVersion = versions.Max(f => int.TryParse(f.Metadata.Version, out var v) ? v : 0);
-            return highestVersion + 1;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting next version number for {BaseFileName}", baseFileName);
-            return 1;
-        }
-    }
-
-    public async Task<string> GetVersionedFileNameAsync(string baseFileName, int version, UserContext userContext)
-    {
-        // Create versioned filename: "document.pdf" -> "document_v1.pdf"
-        var extension = Path.GetExtension(baseFileName);
-        var nameWithoutExtension = Path.GetFileNameWithoutExtension(baseFileName);
-        return await Task.FromResult($"{nameWithoutExtension}_v{version}{extension}");
-    }
 
 
     private async Task EnsureBucketExistsAsync()

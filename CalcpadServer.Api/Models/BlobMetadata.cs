@@ -13,10 +13,8 @@ public class BlobMetadata
 
 public class Metadata
 {
-    public string? OriginalFileName { get; set; }
     public DateTime? DateCreated { get; set; }
     public DateTime? DateUpdated { get; set; }
-    public string? Version { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
     public DateTime? DateReviewed { get; set; }
@@ -34,10 +32,8 @@ public class UploadRequest
 
 public class MetadataRequest
 {
-    public string? OriginalFileName { get; set; }
     public DateTime? DateCreated { get; set; }
     public DateTime? DateUpdated { get; set; }
-    public string? Version { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
     public DateTime? DateReviewed { get; set; }
@@ -54,12 +50,4 @@ public class MetadataUpdateRequest
 public class TagsUpdateRequest
 {
     public Dictionary<string, string> Tags { get; set; } = new();
-}
-
-
-public class VersionCreationResult
-{
-    public string VersionedFileName { get; set; } = string.Empty;
-    public int Version { get; set; }
-    public string BaseFileName { get; set; } = string.Empty;
 }

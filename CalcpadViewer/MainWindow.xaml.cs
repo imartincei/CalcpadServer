@@ -13,11 +13,15 @@ namespace CalcpadViewer;
 public partial class MainWindow : Window
 {
     private IMinioClient? _minioClient;
-    private string _bucketName = "calcpad-storage";
+    private string _workingBucketName = "calcpad-storage-working";
+    private string _stableBucketName = "calcpad-storage-stable";
     private List<BlobMetadata> _files = new();
+    private List<BlobMetadata> _allFiles = new(); // Store all files for filtering
     private IUserService? _userService;
     private List<User> _users = new();
     private User? _selectedUser;
+    private User? _currentUser;
+    private string _currentCategoryFilter = "All";
 
     public MainWindow()
     {
@@ -45,7 +49,13 @@ public partial class MainWindow : Window
             var accessKey = AccessKeyTextBox.Text.Trim();
             var secretKey = SecretKeyBox.Password.Trim();
             var useSSL = UseSSLCheckBox.IsChecked == true;
-            _bucketName = BucketTextBox.Text.Trim();
+            
+            // Update bucket names based on user input prefix
+            var bucketPrefix = BucketTextBox.Text.Trim();
+            if (bucketPrefix.EndsWith("-storage"))
+                bucketPrefix = bucketPrefix.Substring(0, bucketPrefix.Length - 8);
+            _workingBucketName = $"{bucketPrefix}-storage-working";
+            _stableBucketName = $"{bucketPrefix}-storage-stable";
 
             if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
             {
@@ -59,13 +69,20 @@ public partial class MainWindow : Window
                 .WithSSL(useSSL)
                 .Build();
 
-            // Test connection by checking if bucket exists
-            var bucketExistsArgs = new BucketExistsArgs().WithBucket(_bucketName);
-            var bucketExists = await _minioClient.BucketExistsAsync(bucketExistsArgs);
+            // Test connection by checking if buckets exist
+            var workingBucketExistsArgs = new BucketExistsArgs().WithBucket(_workingBucketName);
+            var stableBucketExistsArgs = new BucketExistsArgs().WithBucket(_stableBucketName);
+            
+            var workingBucketExists = await _minioClient.BucketExistsAsync(workingBucketExistsArgs);
+            var stableBucketExists = await _minioClient.BucketExistsAsync(stableBucketExistsArgs);
 
-            if (!bucketExists)
+            if (!workingBucketExists || !stableBucketExists)
             {
-                MessageBox.Show($"Bucket '{_bucketName}' does not exist.", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                var missingBuckets = new List<string>();
+                if (!workingBucketExists) missingBuckets.Add(_workingBucketName);
+                if (!stableBucketExists) missingBuckets.Add(_stableBucketName);
+                
+                MessageBox.Show($"Missing buckets: {string.Join(", ", missingBuckets)}", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -89,6 +106,7 @@ public partial class MainWindow : Window
                 {
                     StatusText.Text = "Logging in admin user...";
                     var authResponse = await _userService.LoginAsync(adminUsername, adminPassword);
+                    _currentUser = authResponse.User;
                     StatusText.Text = $"Admin logged in: {authResponse.User.Username}";
                     AdminTab.IsEnabled = true;
                 }
@@ -121,6 +139,15 @@ public partial class MainWindow : Window
         await LoadFiles();
     }
 
+    private void CategoryTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CategoryTabControl.SelectedItem is TabItem selectedTab)
+        {
+            _currentCategoryFilter = selectedTab.Header.ToString() ?? "All";
+            FilterFilesByCategory();
+        }
+    }
+
     private async Task LoadFiles()
     {
         if (_minioClient == null) return;
@@ -129,21 +156,32 @@ public partial class MainWindow : Window
         {
             StatusText.Text = "Loading files...";
             RefreshButton.IsEnabled = false;
-            FilesListBox.Items.Clear();
-            _files.Clear();
+            _allFiles.Clear();
 
-            var listObjectsArgs = new ListObjectsArgs()
-                .WithBucket(_bucketName)
+            // Load files from working bucket
+            var workingListObjectsArgs = new ListObjectsArgs()
+                .WithBucket(_workingBucketName)
                 .WithRecursive(true);
 
-            await foreach (var item in _minioClient.ListObjectsEnumAsync(listObjectsArgs))
+            await foreach (var item in _minioClient.ListObjectsEnumAsync(workingListObjectsArgs))
             {
-                var metadata = await GetFileMetadata(item.Key);
-                _files.Add(metadata);
-                FilesListBox.Items.Add(item.Key);
+                var metadata = await GetFileMetadata(item.Key, _workingBucketName);
+                _allFiles.Add(metadata);
             }
 
-            StatusText.Text = $"Loaded {_files.Count} files";
+            // Load files from stable bucket
+            var stableListObjectsArgs = new ListObjectsArgs()
+                .WithBucket(_stableBucketName)
+                .WithRecursive(true);
+
+            await foreach (var item in _minioClient.ListObjectsEnumAsync(stableListObjectsArgs))
+            {
+                var metadata = await GetFileMetadata(item.Key, _stableBucketName);
+                _allFiles.Add(metadata);
+            }
+
+            StatusText.Text = $"Loaded {_allFiles.Count} files";
+            FilterFilesByCategory();
         }
         catch (Exception ex)
         {
@@ -156,7 +194,34 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<BlobMetadata> GetFileMetadata(string fileName)
+    private void FilterFilesByCategory()
+    {
+        FilesListBox.Items.Clear();
+        _files.Clear();
+
+        if (_currentCategoryFilter == "All")
+        {
+            _files.AddRange(_allFiles);
+        }
+        else
+        {
+            _files.AddRange(_allFiles.Where(f => 
+            {
+                var category = f.Metadata.ContainsKey("file-category") ? f.Metadata["file-category"] : "Unknown";
+                return category.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase);
+            }));
+        }
+
+        // Add files to display without category brackets
+        foreach (var file in _files)
+        {
+            FilesListBox.Items.Add(file.FileName);
+        }
+
+        StatusText.Text = $"Showing {_files.Count} files ({_currentCategoryFilter})";
+    }
+
+    private async Task<BlobMetadata> GetFileMetadata(string fileName, string bucketName)
     {
         if (_minioClient == null) 
             return new BlobMetadata { FileName = fileName };
@@ -164,7 +229,7 @@ public partial class MainWindow : Window
         try
         {
             var statObjectArgs = new StatObjectArgs()
-                .WithBucket(_bucketName)
+                .WithBucket(bucketName)
                 .WithObject(fileName);
 
             var objectStat = await _minioClient.StatObjectAsync(statObjectArgs);
@@ -179,7 +244,7 @@ public partial class MainWindow : Window
                 }
             }
 
-            var tags = await GetFileTags(fileName);
+            var tags = await GetFileTags(fileName, bucketName);
 
             return new BlobMetadata
             {
@@ -202,14 +267,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<Dictionary<string, string>> GetFileTags(string fileName)
+    private async Task<Dictionary<string, string>> GetFileTags(string fileName, string bucketName)
     {
         if (_minioClient == null) return new Dictionary<string, string>();
 
         try
         {
             var getObjectTagsArgs = new GetObjectTagsArgs()
-                .WithBucket(_bucketName)
+                .WithBucket(bucketName)
                 .WithObject(fileName);
 
             var tagging = await _minioClient.GetObjectTagsAsync(getObjectTagsArgs);
@@ -236,6 +301,21 @@ public partial class MainWindow : Window
         {
             ClearMetadataDisplay();
         }
+    }
+
+    private (string fileName, string bucketName) ExtractFileInfoFromDisplayName(string fileName)
+    {
+        // Find the file metadata to determine the bucket
+        var fileMetadata = _files.FirstOrDefault(f => f.FileName == fileName);
+        if (fileMetadata != null)
+        {
+            var category = fileMetadata.Metadata.ContainsKey("file-category") ? fileMetadata.Metadata["file-category"] : "Unknown";
+            var bucketName = category.ToLower() == "working" ? _workingBucketName : _stableBucketName;
+            return (fileName, bucketName);
+        }
+        
+        // Fallback - default to stable bucket
+        return (fileName, _stableBucketName);
     }
 
     private void DisplayFileMetadata(BlobMetadata metadata)
@@ -328,11 +408,11 @@ public partial class MainWindow : Window
 
         if (uploadDialog.ShowDialog() == true)
         {
-            await UploadFile(uploadDialog.SelectedFilePath!, uploadDialog.Tags, uploadDialog.Metadata);
+            await UploadFile(uploadDialog.SelectedFilePath!, uploadDialog.Filename!, uploadDialog.Tags, uploadDialog.Metadata);
         }
     }
 
-    private async Task UploadFile(string filePath, Dictionary<string, string> tags, MetadataRequest metadata)
+    private async Task UploadFile(string filePath, string fileName, Dictionary<string, string> tags, MetadataRequest metadata)
     {
         if (_minioClient == null) return;
 
@@ -340,40 +420,39 @@ public partial class MainWindow : Window
         {
             StatusText.Text = "Uploading file...";
             UploadButton.IsEnabled = false;
-
-            var fileName = Path.GetFileName(filePath);
+            
+            // Determine bucket based on FileCategory - only "Working" goes to working bucket, all others go to stable
+            var targetBucket = metadata.FileCategory?.ToLower() == "working" ? _workingBucketName : _stableBucketName;
             
             using var fileStream = File.OpenRead(filePath);
             var putObjectArgs = new PutObjectArgs()
-                .WithBucket(_bucketName)
+                .WithBucket(targetBucket)
                 .WithObject(fileName)
                 .WithStreamData(fileStream)
                 .WithObjectSize(fileStream.Length)
                 .WithContentType(GetContentType(fileName));
 
-            // Add structured metadata with proper x-amz-meta- prefixes
+            // Add structured metadata
             var headers = new Dictionary<string, string>();
             
-            if (!string.IsNullOrEmpty(metadata.OriginalFileName))
-                headers["x-amz-meta-original-filename"] = metadata.OriginalFileName;
-            if (!string.IsNullOrEmpty(metadata.Version))
-                headers["x-amz-meta-version"] = metadata.Version;
-            if (metadata.DateCreated.HasValue)
-                headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
-            if (metadata.DateUpdated.HasValue)
-                headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
-            if (!string.IsNullOrEmpty(metadata.CreatedBy))
-                headers["x-amz-meta-created-by"] = metadata.CreatedBy;
-            if (!string.IsNullOrEmpty(metadata.UpdatedBy))
-                headers["x-amz-meta-updated-by"] = metadata.UpdatedBy;
+            // Auto-assign current date and user for created/updated fields
+            var currentDate = DateTime.UtcNow;
+            var currentUserEmail = _currentUser?.Email ?? "unknown";
+            
+            headers["date-created"] = currentDate.ToString("O");
+            headers["date-updated"] = currentDate.ToString("O");
+            headers["created-by"] = currentUserEmail;
+            headers["updated-by"] = currentUserEmail;
+            if (!string.IsNullOrEmpty(metadata.FileCategory))
+                headers["file-category"] = metadata.FileCategory;
             if (metadata.DateReviewed.HasValue)
-                headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
+                headers["date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
             if (!string.IsNullOrEmpty(metadata.ReviewedBy))
-                headers["x-amz-meta-reviewed-by"] = metadata.ReviewedBy;
+                headers["reviewed-by"] = metadata.ReviewedBy;
             if (!string.IsNullOrEmpty(metadata.TestedBy))
-                headers["x-amz-meta-tested-by"] = metadata.TestedBy;
+                headers["tested-by"] = metadata.TestedBy;
             if (metadata.DateTested.HasValue)
-                headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
+                headers["date-tested"] = metadata.DateTested.Value.ToString("O");
 
             if (headers.Any())
             {
@@ -391,7 +470,7 @@ public partial class MainWindow : Window
                     var tagging = new Tagging(tags, true);
 
                     var setObjectTagsArgs = new SetObjectTagsArgs()
-                        .WithBucket(_bucketName)
+                        .WithBucket(targetBucket)
                         .WithObject(fileName)
                         .WithTagging(tagging);
 
@@ -661,6 +740,8 @@ public partial class MainWindow : Window
             return;
         }
 
+        var (actualFileName, bucketName) = ExtractFileInfoFromDisplayName(selectedFileName);
+
         try
         {
             StatusText.Text = "Downloading file...";
@@ -669,14 +750,14 @@ public partial class MainWindow : Window
             // Show save file dialog
             var saveFileDialog = new Microsoft.Win32.SaveFileDialog
             {
-                FileName = selectedFileName,
+                FileName = actualFileName,
                 Title = "Save File As",
                 Filter = "All Files (*.*)|*.*"
             };
 
             if (saveFileDialog.ShowDialog() == true)
             {
-                await DownloadFile(selectedFileName, saveFileDialog.FileName);
+                await DownloadFile(actualFileName, saveFileDialog.FileName, bucketName);
                 MessageBox.Show($"File downloaded successfully to:\n{saveFileDialog.FileName}", "Download Complete", MessageBoxButton.OK, MessageBoxImage.Information);
                 StatusText.Text = "Download completed";
             }
@@ -696,10 +777,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task DownloadFile(string fileName, string localFilePath)
+    private async Task DownloadFile(string fileName, string localFilePath, string bucketName)
     {
         var getObjectArgs = new GetObjectArgs()
-            .WithBucket(_bucketName)
+            .WithBucket(bucketName)
             .WithObject(fileName)
             .WithCallbackStream(stream =>
             {
@@ -718,9 +799,11 @@ public partial class MainWindow : Window
             return;
         }
 
+        var (actualFileName, bucketName) = ExtractFileInfoFromDisplayName(selectedFileName);
+
         // Confirm deletion
         var result = MessageBox.Show(
-            $"Are you sure you want to delete '{selectedFileName}'?\n\nThis action cannot be undone.",
+            $"Are you sure you want to delete '{actualFileName}' from {bucketName}?\n\nThis action cannot be undone.",
             "Confirm Delete",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
@@ -735,9 +818,9 @@ public partial class MainWindow : Window
             StatusText.Text = "Deleting file...";
             DeleteButton.IsEnabled = false;
 
-            await DeleteFile(selectedFileName);
+            await DeleteFile(actualFileName, bucketName);
             
-            MessageBox.Show($"File '{selectedFileName}' deleted successfully.", "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"File '{actualFileName}' deleted successfully.", "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             StatusText.Text = "File deleted successfully";
             
             // Refresh the file list and clear metadata display
@@ -755,10 +838,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task DeleteFile(string fileName)
+    private async Task DeleteFile(string fileName, string bucketName)
     {
         var removeObjectArgs = new RemoveObjectArgs()
-            .WithBucket(_bucketName)
+            .WithBucket(bucketName)
             .WithObject(fileName);
 
         await _minioClient.RemoveObjectAsync(removeObjectArgs);

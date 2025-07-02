@@ -8,6 +8,7 @@ namespace CalcpadViewer;
 public partial class UploadDialog : Window
 {
     public string? SelectedFilePath { get; private set; }
+    public string? Filename { get; private set; }
     public Dictionary<string, string> Tags { get; private set; } = new();
     public MetadataRequest Metadata { get; private set; } = new();
     
@@ -29,10 +30,10 @@ public partial class UploadDialog : Window
             SelectedFilePath = openFileDialog.FileName;
             FilePathTextBox.Text = SelectedFilePath;
             
-            // Auto-populate original filename if not set
-            if (string.IsNullOrEmpty(OriginalFileNameTextBox.Text))
+            // Auto-populate filename if not set
+            if (string.IsNullOrEmpty(FilenameTextBox.Text))
             {
-                OriginalFileNameTextBox.Text = Path.GetFileName(SelectedFilePath);
+                FilenameTextBox.Text = Path.GetFileName(SelectedFilePath);
             }
             
             UploadButton.IsEnabled = true;
@@ -53,13 +54,13 @@ public partial class UploadDialog : Window
             return;
         }
 
+        // Capture the filename from the textbox
+        Filename = string.IsNullOrWhiteSpace(FilenameTextBox.Text) ? Path.GetFileName(SelectedFilePath) : FilenameTextBox.Text.Trim();
+
         // Parse structured metadata
         Metadata = new MetadataRequest
         {
-            OriginalFileName = string.IsNullOrWhiteSpace(OriginalFileNameTextBox.Text) ? null : OriginalFileNameTextBox.Text.Trim(),
-            UpdatedBy = string.IsNullOrWhiteSpace(UpdatedByTextBox.Text) ? null : UpdatedByTextBox.Text.Trim(),
-            DateCreated = DateCreatedPicker.SelectedDate,
-            DateUpdated = DateUpdatedPicker.SelectedDate,
+            FileCategory = DetermineFileCategory(SelectedFilePath),
             ReviewedBy = string.IsNullOrWhiteSpace(ReviewedByTextBox.Text) ? null : ReviewedByTextBox.Text.Trim(),
             DateReviewed = DateReviewedPicker.SelectedDate,
             TestedBy = string.IsNullOrWhiteSpace(TestedByTextBox.Text) ? null : TestedByTextBox.Text.Trim(),
@@ -93,18 +94,37 @@ public partial class UploadDialog : Window
         DialogResult = false;
         Close();
     }
+
+    private string DetermineFileCategory(string filePath)
+    {
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        
+        return extension switch
+        {
+            // Photo files
+            ".jpg" or ".jpeg" or ".png" or ".gif" or ".bmp" or ".tiff" or ".webp" => "Photo",
+            
+            // Data files
+            ".xlsx" or ".csv" or ".txt" => "Data",
+            
+            // Working files (Calcpad files)
+            ".cpd" or ".cpdz" => "Working",
+            
+            // Default for unknown extensions
+            _ => "Data"
+        };
+    }
 }
 
 public class MetadataRequest
 {
-    public string? OriginalFileName { get; set; }
     public DateTime? DateCreated { get; set; }
     public DateTime? DateUpdated { get; set; }
-    public string? Version { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
     public DateTime? DateReviewed { get; set; }
     public string? ReviewedBy { get; set; }
     public string? TestedBy { get; set; }
     public DateTime? DateTested { get; set; }
+    public string? FileCategory { get; set; }
 }

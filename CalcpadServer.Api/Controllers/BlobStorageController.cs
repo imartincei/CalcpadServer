@@ -196,36 +196,6 @@ public class BlobStorageController : ControllerBase
         }
     }
 
-    [HttpPost("new-version/{baseFileName}")]
-    [AuthorizeRole(UserRole.Contributor)]
-    public async Task<IActionResult> CreateNewVersion(string baseFileName, [FromForm] UploadRequest request)
-    {
-        if (request.File == null || request.File.Length == 0)
-        {
-            return BadRequest("No file provided");
-        }
-
-        try
-        {
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
-            
-            using var stream = request.File.OpenReadStream();
-            var result = await _blobStorageService.CreateNewVersionWithResultAsync(
-                baseFileName,
-                stream,
-                userContext,
-                request.File.ContentType,
-                request.Tags,
-                request.Metadata);
-
-            return Ok(new { VersionedFileName = result.VersionedFileName, Message = $"New version created successfully", BaseFileName = result.BaseFileName, Version = result.Version });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating new version for {BaseFileName}", baseFileName);
-            return StatusCode(500, "Internal server error");
-        }
-    }
 
     [HttpGet("tags/{fileName}")]
     public async Task<IActionResult> GetFileTags(string fileName)
@@ -305,87 +275,8 @@ public class BlobStorageController : ControllerBase
         }
     }
 
-    [HttpGet("versions/{baseFileName}")]
-    public async Task<IActionResult> ListFileVersions(string baseFileName)
-    {
-        try
-        {
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
-            
-            var versions = await _blobStorageService.ListFileVersionsAsync(baseFileName, userContext);
-            return Ok(versions);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error listing versions for {BaseFileName}", baseFileName);
-            return StatusCode(500, "Internal server error");
-        }
-    }
 
-    [HttpGet("latest/{baseFileName}")]
-    public async Task<IActionResult> GetLatestVersion(string baseFileName)
-    {
-        try
-        {
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
-            
-            var latestMetadata = await _blobStorageService.GetLatestVersionMetadataAsync(baseFileName, userContext);
-            return Ok(latestMetadata);
-        }
-        catch (FileNotFoundException)
-        {
-            return NotFound($"No versions found for base file '{baseFileName}'");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting latest version for {BaseFileName}", baseFileName);
-            return StatusCode(500, "Internal server error");
-        }
-    }
 
-    [HttpGet("download-latest/{baseFileName}")]
-    public async Task<IActionResult> DownloadLatestVersion(string baseFileName)
-    {
-        try
-        {
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
-            
-            var fileStream = await _blobStorageService.DownloadLatestVersionAsync(baseFileName, userContext);
-            return File(fileStream, "application/octet-stream", baseFileName);
-        }
-        catch (FileNotFoundException)
-        {
-            return NotFound($"No versions found for base file '{baseFileName}'");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error downloading latest version for {BaseFileName}", baseFileName);
-            return StatusCode(500, "Internal server error");
-        }
-    }
 
-    [HttpDelete("all-versions/{baseFileName}")]
-    [AuthorizeRole(UserRole.Admin)]
-    public async Task<IActionResult> DeleteAllVersions(string baseFileName)
-    {
-        try
-        {
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
-            
-            var success = await _blobStorageService.DeleteAllVersionsAsync(baseFileName, userContext);
-            
-            if (success)
-            {
-                return Ok(new { Message = $"All versions of '{baseFileName}' deleted successfully" });
-            }
-            
-            return StatusCode(500, "Failed to delete all versions");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting all versions for {BaseFileName}", baseFileName);
-            return StatusCode(500, "Internal server error");
-        }
-    }
 
 }

@@ -44,34 +44,22 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
-                        <Label Grid.Row="0" Grid.Column="0" Content="Original Name:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="OriginalFileNameTextBox" Grid.Row="0" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="0" Grid.Column="0" Content="Filename:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="FilenameTextBox" Grid.Row="0" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="1" Grid.Column="0" Content="Updated By:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="UpdatedByTextBox" Grid.Row="1" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="1" Grid.Column="0" Content="Reviewed By:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="ReviewedByTextBox" Grid.Row="1" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="2" Grid.Column="0" Content="Date Created:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateCreatedPicker" Grid.Row="2" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="2" Grid.Column="0" Content="Date Reviewed:" VerticalAlignment="Center"/>
+                        <DatePicker x:Name="DateReviewedPicker" Grid.Row="2" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="3" Grid.Column="0" Content="Date Updated:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateUpdatedPicker" Grid.Row="3" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="3" Grid.Column="0" Content="Tested By:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="TestedByTextBox" Grid.Row="3" Grid.Column="1" Margin="5"/>
                         
-                        <Label Grid.Row="4" Grid.Column="0" Content="Reviewed By:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="ReviewedByTextBox" Grid.Row="4" Grid.Column="1" Margin="5"/>
-                        
-                        <Label Grid.Row="5" Grid.Column="0" Content="Date Reviewed:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateReviewedPicker" Grid.Row="5" Grid.Column="1" Margin="5"/>
-                        
-                        <Label Grid.Row="6" Grid.Column="0" Content="Tested By:" VerticalAlignment="Center"/>
-                        <TextBox x:Name="TestedByTextBox" Grid.Row="6" Grid.Column="1" Margin="5"/>
-                        
-                        <Label Grid.Row="7" Grid.Column="0" Content="Date Tested:" VerticalAlignment="Center"/>
-                        <DatePicker x:Name="DateTestedPicker" Grid.Row="7" Grid.Column="1" Margin="5"/>
+                        <Label Grid.Row="4" Grid.Column="0" Content="Date Tested:" VerticalAlignment="Center"/>
+                        <DatePicker x:Name="DateTestedPicker" Grid.Row="4" Grid.Column="1" Margin="5"/>
                     </Grid>
                 </GroupBox>
                 

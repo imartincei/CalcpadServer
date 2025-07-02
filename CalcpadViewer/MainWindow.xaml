@@ -70,6 +70,7 @@
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             
@@ -85,7 +86,17 @@
                                         Background="LightCoral"/>
                             </StackPanel>
                             
-                            <ListBox x:Name="FilesListBox" Grid.Row="1" Margin="5" 
+                            <!-- Category Tabs -->
+                            <TabControl x:Name="CategoryTabControl" Grid.Row="1" SelectionChanged="CategoryTabControl_SelectionChanged">
+                                <TabItem Header="All" x:Name="AllTab"/>
+                                <TabItem Header="Working" x:Name="WorkingTab"/>
+                                <TabItem Header="Photo" x:Name="PhotoTab"/>
+                                <TabItem Header="Data" x:Name="DataTab"/>
+                                <TabItem Header="Module" x:Name="ModuleTab"/>
+                                <TabItem Header="Template" x:Name="TemplateTab"/>
+                            </TabControl>
+                            
+                            <ListBox x:Name="FilesListBox" Grid.Row="2" Margin="5" 
                                      SelectionChanged="FilesListBox_SelectionChanged"/>
                         </Grid>
                     </GroupBox>
