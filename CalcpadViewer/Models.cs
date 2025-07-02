@@ -8,10 +8,10 @@ public class BlobMetadata
     public string ContentType { get; set; } = string.Empty;
     public string ETag { get; set; } = string.Empty;
     public Dictionary<string, string> Tags { get; set; } = new();
-    public StructuredMetadata Metadata { get; set; } = new();
+    public Metadata Metadata { get; set; } = new();
 }
 
-public class StructuredMetadata
+public class Metadata
 {
     public string? OriginalFileName { get; set; }
     public DateTime? DateCreated { get; set; }

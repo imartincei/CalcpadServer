@@ -7,10 +7,10 @@ namespace CalcpadServer.Api.Services;
 
 public interface IBlobStorageService
 {
-    Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null);
+    Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null);
     Task<string> UploadFileAsync(string fileName, Stream fileStream, string contentType = "application/octet-stream");
-    Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null);
-    Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null);
+    Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null);
+    Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null);
     Task<Stream> DownloadFileAsync(string fileName, UserContext userContext);
     Task<Stream> DownloadLatestVersionAsync(string baseFileName, UserContext userContext);
     Task<bool> DeleteFileAsync(string fileName, UserContext userContext);
@@ -43,7 +43,7 @@ public class BlobStorageService : IBlobStorageService
         _userService = userService;
     }
 
-    public async Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null)
+    public async Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
     {
         try
         {
@@ -267,7 +267,7 @@ public class BlobStorageService : IBlobStorageService
             _logger.LogInformation("Retrieved metadata for file {FileName}: {Metadata}", fileName, 
                 objectStat.MetaData != null ? string.Join(", ", objectStat.MetaData.Select(m => $"{m.Key}={m.Value}")) : "No metadata");
             
-            var metadata = new StructuredMetadata();
+            var metadata = new Metadata();
             
             if (objectStat.MetaData != null)
             {
@@ -434,7 +434,7 @@ public class BlobStorageService : IBlobStorageService
         }
     }
 
-    public async Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null)
+    public async Task<string> CreateNewVersionAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
     {
         try
         {
@@ -507,7 +507,7 @@ public class BlobStorageService : IBlobStorageService
         }
     }
 
-    public async Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, StructuredMetadataRequest? metadata = null)
+    public async Task<VersionCreationResult> CreateNewVersionWithResultAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
     {
         try
         {

@@ -9,7 +9,7 @@ public partial class UploadDialog : Window
 {
     public string? SelectedFilePath { get; private set; }
     public Dictionary<string, string> Tags { get; private set; } = new();
-    public StructuredMetadataRequest Metadata { get; private set; } = new();
+    public MetadataRequest Metadata { get; private set; } = new();
     
     public UploadDialog()
     {
@@ -54,7 +54,7 @@ public partial class UploadDialog : Window
         }
 
         // Parse structured metadata
-        Metadata = new StructuredMetadataRequest
+        Metadata = new MetadataRequest
         {
             OriginalFileName = string.IsNullOrWhiteSpace(OriginalFileNameTextBox.Text) ? null : OriginalFileNameTextBox.Text.Trim(),
             UpdatedBy = string.IsNullOrWhiteSpace(UpdatedByTextBox.Text) ? null : UpdatedByTextBox.Text.Trim(),
@@ -95,7 +95,7 @@ public partial class UploadDialog : Window
     }
 }
 
-public class StructuredMetadataRequest
+public class MetadataRequest
 {
     public string? OriginalFileName { get; set; }
     public DateTime? DateCreated { get; set; }

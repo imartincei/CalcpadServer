@@ -8,10 +8,10 @@ public class BlobMetadata
     public string ContentType { get; set; } = string.Empty;
     public string ETag { get; set; } = string.Empty;
     public Dictionary<string, string> Tags { get; set; } = new();
-    public StructuredMetadata Metadata { get; set; } = new();
+    public Metadata Metadata { get; set; } = new();
 }
 
-public class StructuredMetadata
+public class Metadata
 {
     public string? OriginalFileName { get; set; }
     public DateTime? DateCreated { get; set; }
@@ -29,10 +29,10 @@ public class UploadRequest
 {
     public IFormFile File { get; set; } = null!;
     public Dictionary<string, string>? Tags { get; set; }
-    public StructuredMetadataRequest? Metadata { get; set; }
+    public MetadataRequest? Metadata { get; set; }
 }
 
-public class StructuredMetadataRequest
+public class MetadataRequest
 {
     public string? OriginalFileName { get; set; }
     public DateTime? DateCreated { get; set; }
@@ -48,7 +48,7 @@ public class StructuredMetadataRequest
 
 public class MetadataUpdateRequest
 {
-    public StructuredMetadataRequest? Metadata { get; set; }
+    public MetadataRequest? Metadata { get; set; }
 }
 
 public class TagsUpdateRequest

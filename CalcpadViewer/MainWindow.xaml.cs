@@ -170,7 +170,7 @@ public partial class MainWindow : Window
             var objectStat = await _minioClient.StatObjectAsync(statObjectArgs);
             
             var customMetadata = new Dictionary<string, string>();
-            var structuredMetadata = new StructuredMetadata();
+            var Metadata = new Metadata();
             
             if (objectStat.MetaData != null)
             {
@@ -180,47 +180,45 @@ public partial class MainWindow : Window
                     if (kvp.Key.StartsWith("x-amz-meta-", StringComparison.OrdinalIgnoreCase))
                     {
                         var key = kvp.Key.Substring("x-amz-meta-".Length);
-                        
+
                         // Parse structured metadata fields
                         switch (key.ToLower())
                         {
                             case "original-filename":
-                                structuredMetadata.OriginalFileName = kvp.Value;
+                                Metadata.OriginalFileName = kvp.Value;
                                 break;
                             case "date-created":
                                 if (DateTime.TryParse(kvp.Value, out var dateCreated))
-                                    structuredMetadata.DateCreated = dateCreated;
+                                    Metadata.DateCreated = dateCreated;
                                 break;
                             case "date-updated":
                                 if (DateTime.TryParse(kvp.Value, out var dateUpdated))
-                                    structuredMetadata.DateUpdated = dateUpdated;
+                                    Metadata.DateUpdated = dateUpdated;
                                 break;
                             case "version":
-                                structuredMetadata.Version = kvp.Value;
+                                Metadata.Version = kvp.Value;
                                 break;
                             case "created-by":
-                                structuredMetadata.CreatedBy = kvp.Value;
+                                Metadata.CreatedBy = kvp.Value;
                                 break;
                             case "updated-by":
-                                structuredMetadata.UpdatedBy = kvp.Value;
+                                Metadata.UpdatedBy = kvp.Value;
                                 break;
                             case "date-reviewed":
                                 if (DateTime.TryParse(kvp.Value, out var dateReviewed))
-                                    structuredMetadata.DateReviewed = dateReviewed;
+                                    Metadata.DateReviewed = dateReviewed;
                                 break;
                             case "reviewed-by":
-                                structuredMetadata.ReviewedBy = kvp.Value;
+                                Metadata.ReviewedBy = kvp.Value;
                                 break;
                             case "tested-by":
-                                structuredMetadata.TestedBy = kvp.Value;
+                                Metadata.TestedBy = kvp.Value;
                                 break;
                             case "date-tested":
                                 if (DateTime.TryParse(kvp.Value, out var dateTested))
-                                    structuredMetadata.DateTested = dateTested;
+                                    Metadata.DateTested = dateTested;
                                 break;
                             default:
-                                // Add to custom metadata if not a structured field
-                                customMetadata[key] = kvp.Value;
                                 break;
                         }
                     }
@@ -242,7 +240,7 @@ public partial class MainWindow : Window
                 ContentType = objectStat.ContentType ?? "application/octet-stream",
                 ETag = objectStat.ETag ?? string.Empty,
                 Tags = tags,
-                Metadata = structuredMetadata
+                Metadata = Metadata
             };
         }
         catch (Exception ex)
@@ -328,8 +326,6 @@ public partial class MainWindow : Window
         if (metadata.Metadata.DateTested.HasValue)
             allMetadataItems.Add(new KeyValueDisplay { Key = "Date Tested", Value = metadata.Metadata.DateTested.Value.ToString("yyyy-MM-dd HH:mm:ss") });
 
-
-        // Show all metadata in the custom metadata section (rename it to just "Metadata")
         MetadataGroup.Visibility = Visibility.Visible;
         if (allMetadataItems.Any())
         {
@@ -342,9 +338,6 @@ public partial class MainWindow : Window
                 new KeyValueDisplay { Key = "Status", Value = "No metadata found" } 
             };
         }
-
-        // Hide the structured metadata section since we're combining everything
-        StructuredMetadataGroup.Visibility = Visibility.Collapsed;
 
         // Tags - Always show section, display "None" if empty
         TagsGroup.Visibility = Visibility.Visible;
@@ -366,7 +359,6 @@ public partial class MainWindow : Window
     {
         NoSelectionText.Visibility = Visibility.Visible;
         FileInfoGroup.Visibility = Visibility.Collapsed;
-        StructuredMetadataGroup.Visibility = Visibility.Collapsed; // Always hidden now
         MetadataGroup.Visibility = Visibility.Visible;
         TagsGroup.Visibility = Visibility.Visible;
         
@@ -409,7 +401,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task UploadFile(string filePath, Dictionary<string, string> tags, StructuredMetadataRequest metadata)
+    private async Task UploadFile(string filePath, Dictionary<string, string> tags, MetadataRequest metadata)
     {
         if (_minioClient == null) return;
 

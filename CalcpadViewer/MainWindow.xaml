@@ -113,42 +113,24 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        
+
                                         <Label Grid.Row="0" Grid.Column="0" Content="File Name:" FontWeight="Bold"/>
                                         <TextBlock x:Name="FileNameText" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap"/>
-                                        
+
                                         <Label Grid.Row="1" Grid.Column="0" Content="Size:" FontWeight="Bold"/>
                                         <TextBlock x:Name="FileSizeText" Grid.Row="1" Grid.Column="1"/>
-                                        
+
                                         <Label Grid.Row="2" Grid.Column="0" Content="Last Modified:" FontWeight="Bold"/>
                                         <TextBlock x:Name="LastModifiedText" Grid.Row="2" Grid.Column="1"/>
-                                        
+
                                         <Label Grid.Row="3" Grid.Column="0" Content="Content Type:" FontWeight="Bold"/>
                                         <TextBlock x:Name="ContentTypeText" Grid.Row="3" Grid.Column="1"/>
-                                        
+
                                         <Label Grid.Row="4" Grid.Column="0" Content="ETag:" FontWeight="Bold"/>
                                         <TextBlock x:Name="ETagText" Grid.Row="4" Grid.Column="1" TextWrapping="Wrap"/>
                                     </Grid>
                                 </GroupBox>
-                                
-                                <!-- Structured Metadata -->
-                                <GroupBox x:Name="StructuredMetadataGroup" Header="Structured Metadata" Margin="0,0,0,10">
-                                    <ItemsControl x:Name="StructuredMetadataItems">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Grid Margin="0,2">
-                                                    <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="150"/>
-                                                        <ColumnDefinition Width="*"/>
-                                                    </Grid.ColumnDefinitions>
-                                                    <Label Grid.Column="0" Content="{Binding Key}" FontWeight="Bold"/>
-                                                    <TextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap"/>
-                                                </Grid>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </GroupBox>
-                                
+
                                 <!-- Metadata -->
                                 <GroupBox x:Name="MetadataGroup" Header="Metadata" Margin="0,0,0,10">
                                     <ItemsControl x:Name="MetadataItems">
