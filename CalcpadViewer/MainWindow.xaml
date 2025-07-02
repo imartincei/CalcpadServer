@@ -4,57 +4,58 @@
         Title="Calcpad File Viewer" Height="600" Width="1000">
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         
-        <!-- Connection Panel -->
-        <GroupBox Header="Connection Settings" Grid.Row="0" Margin="10">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                
-                <!-- MinIO Settings -->
-                <Label Grid.Row="0" Grid.Column="0" Content="Endpoint:" VerticalAlignment="Center"/>
-                <TextBox x:Name="EndpointTextBox" Grid.Row="0" Grid.Column="1" Margin="5" Text="localhost:9000"/>
-                
-                <Label Grid.Row="0" Grid.Column="2" Content="Bucket:" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                <TextBox x:Name="BucketTextBox" Grid.Row="0" Grid.Column="3" Margin="5" Text="calcpad-storage"/>
-                
-                <Button x:Name="ConnectButton" Grid.Row="0" Grid.Column="4" Content="Connect" 
-                        Margin="10,5,0,5" Padding="10,5" Click="ConnectButton_Click"/>
-                
-                <Label Grid.Row="1" Grid.Column="0" Content="Access Key:" VerticalAlignment="Center"/>
-                <TextBox x:Name="AccessKeyTextBox" Grid.Row="1" Grid.Column="1" Margin="5" Text="calcpad-admin"/>
-                
-                <Label Grid.Row="1" Grid.Column="2" Content="Secret Key:" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                <PasswordBox x:Name="SecretKeyBox" Grid.Row="1" Grid.Column="3" Margin="5"/>
-                
-                <CheckBox x:Name="UseSSLCheckBox" Grid.Row="1" Grid.Column="4" Content="Use SSL" 
-                          VerticalAlignment="Center" Margin="10,0,0,0"/>
-                
-                <!-- Admin Login -->
-                <Label Grid.Row="2" Grid.Column="0" Content="Admin User:" VerticalAlignment="Center"/>
-                <TextBox x:Name="AdminUsernameTextBox" Grid.Row="2" Grid.Column="1" Margin="5" Text="admin"/>
-                
-                <Label Grid.Row="2" Grid.Column="2" Content="Admin Password:" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                <PasswordBox x:Name="AdminPasswordBox" Grid.Row="2" Grid.Column="3" Margin="5"/>
-            </Grid>
-        </GroupBox>
-        
         <!-- Main Content with Tabs -->
-        <TabControl Grid.Row="1" Margin="10">
+        <TabControl Grid.Row="0" Margin="10">
+            <!-- Start Tab -->
+            <TabItem Header="Start" x:Name="StartTab">
+                <GroupBox Header="Connection Settings" Margin="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        
+                        <!-- MinIO Settings -->
+                        <Label Grid.Row="0" Grid.Column="0" Content="Endpoint:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="EndpointTextBox" Grid.Row="0" Grid.Column="1" Margin="5" Text="localhost:9000"/>
+                        
+                        <Label Grid.Row="0" Grid.Column="2" Content="Bucket:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <TextBox x:Name="BucketTextBox" Grid.Row="0" Grid.Column="3" Margin="5" Text="calcpad-storage"/>
+                        
+                        <Button x:Name="ConnectButton" Grid.Row="0" Grid.Column="4" Content="Connect" 
+                                Margin="10,5,0,5" Padding="10,5" Click="ConnectButton_Click"/>
+                        
+                        <Label Grid.Row="1" Grid.Column="0" Content="Access Key:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="AccessKeyTextBox" Grid.Row="1" Grid.Column="1" Margin="5" Text="calcpad-admin"/>
+                        
+                        <Label Grid.Row="1" Grid.Column="2" Content="Secret Key:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <PasswordBox x:Name="SecretKeyBox" Grid.Row="1" Grid.Column="3" Margin="5"/>
+                        
+                        <CheckBox x:Name="UseSSLCheckBox" Grid.Row="1" Grid.Column="4" Content="Use SSL" 
+                                  VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        
+                        <!-- Admin Login -->
+                        <Label Grid.Row="2" Grid.Column="0" Content="Admin User:" VerticalAlignment="Center"/>
+                        <TextBox x:Name="AdminUsernameTextBox" Grid.Row="2" Grid.Column="1" Margin="5" Text="admin"/>
+                        
+                        <Label Grid.Row="2" Grid.Column="2" Content="Admin Password:" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        <PasswordBox x:Name="AdminPasswordBox" Grid.Row="2" Grid.Column="3" Margin="5"/>
+                    </Grid>
+                </GroupBox>
+            </TabItem>
+            
             <!-- Files Tab -->
             <TabItem Header="Files" x:Name="FilesTab">
                 <Grid>
@@ -274,7 +275,7 @@
         </TabControl>
         
         <!-- Status Bar -->
-        <StatusBar Grid.Row="2">
+        <StatusBar Grid.Row="1">
             <StatusBarItem>
                 <TextBlock x:Name="StatusText" Text="Ready"/>
             </StatusBarItem>
