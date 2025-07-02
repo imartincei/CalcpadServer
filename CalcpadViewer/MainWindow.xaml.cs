@@ -169,14 +169,13 @@ public partial class MainWindow : Window
 
             var objectStat = await _minioClient.StatObjectAsync(statObjectArgs);
             
-            var customMetadata = new Dictionary<string, string>();
-            var Metadata = new Metadata();
+            var Metadata = new Dictionary<string, string>();
             
             if (objectStat.MetaData != null)
             {
                 foreach (var kvp in objectStat.MetaData)
                 {
-                    customMetadata[kvp.Key] = kvp.Value;
+                    Metadata[kvp.Key] = kvp.Value;
                 }
             }
 
@@ -253,28 +252,10 @@ public partial class MainWindow : Window
 
         // All Metadata - Combined structured and custom metadata
         var allMetadataItems = new List<KeyValueDisplay>();
-        
-        // Add structured metadata with descriptive names
-        if (!string.IsNullOrEmpty(metadata.Metadata.OriginalFileName))
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Original Filename", Value = metadata.Metadata.OriginalFileName });
-        if (metadata.Metadata.DateCreated.HasValue)
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Created", Value = metadata.Metadata.DateCreated.Value.ToString("yyyy-MM-dd HH:mm:ss") });
-        if (metadata.Metadata.DateUpdated.HasValue)
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Updated", Value = metadata.Metadata.DateUpdated.Value.ToString("yyyy-MM-dd HH:mm:ss") });
-        if (!string.IsNullOrEmpty(metadata.Metadata.Version))
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Version", Value = metadata.Metadata.Version });
-        if (!string.IsNullOrEmpty(metadata.Metadata.CreatedBy))
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Created By", Value = metadata.Metadata.CreatedBy });
-        if (!string.IsNullOrEmpty(metadata.Metadata.UpdatedBy))
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Updated By", Value = metadata.Metadata.UpdatedBy });
-        if (metadata.Metadata.DateReviewed.HasValue)
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Reviewed", Value = metadata.Metadata.DateReviewed.Value.ToString("yyyy-MM-dd HH:mm:ss") });
-        if (!string.IsNullOrEmpty(metadata.Metadata.ReviewedBy))
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Reviewed By", Value = metadata.Metadata.ReviewedBy });
-        if (!string.IsNullOrEmpty(metadata.Metadata.TestedBy))
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Tested By", Value = metadata.Metadata.TestedBy });
-        if (metadata.Metadata.DateTested.HasValue)
-            allMetadataItems.Add(new KeyValueDisplay { Key = "Date Tested", Value = metadata.Metadata.DateTested.Value.ToString("yyyy-MM-dd HH:mm:ss") });
+        foreach (var kvp in metadata.Metadata)
+        {
+            allMetadataItems.Add(new KeyValueDisplay { Key = kvp.Key, Value = kvp.Value });
+        }
 
         MetadataGroup.Visibility = Visibility.Visible;
         if (allMetadataItems.Any())

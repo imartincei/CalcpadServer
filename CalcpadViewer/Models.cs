@@ -7,22 +7,8 @@ public class BlobMetadata
     public DateTime LastModified { get; set; }
     public string ContentType { get; set; } = string.Empty;
     public string ETag { get; set; } = string.Empty;
-    public Dictionary<string, string> Tags { get; set; } = new();
-    public Metadata Metadata { get; set; } = new();
-}
-
-public class Metadata
-{
-    public string? OriginalFileName { get; set; }
-    public DateTime? DateCreated { get; set; }
-    public DateTime? DateUpdated { get; set; }
-    public string? Version { get; set; }
-    public string? CreatedBy { get; set; }
-    public string? UpdatedBy { get; set; }
-    public DateTime? DateReviewed { get; set; }
-    public string? ReviewedBy { get; set; }
-    public string? TestedBy { get; set; }
-    public DateTime? DateTested { get; set; }
+    public Dictionary<string, string> Tags { get; set; } = [];
+    public Dictionary<string, string> Metadata { get; set; } = [];
 }
 
 public class KeyValueDisplay
