@@ -141,7 +141,7 @@ public partial class MainWindow : Window
 
     private void CategoryTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (CategoryTabControl.SelectedItem is TabItem selectedTab)
+        if (sender is TabControl tabControl && tabControl.SelectedItem is TabItem selectedTab)
         {
             _currentCategoryFilter = selectedTab.Header.ToString() ?? "All";
             FilterFilesByCategory();
