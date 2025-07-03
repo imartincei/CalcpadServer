@@ -973,7 +973,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ViewVersionsButton_Click(object sender, RoutedEventArgs e)
+    private void ViewVersionsButton_Click(object sender, RoutedEventArgs e)
     {
         if (FilesListBox.SelectedItem is not string selectedFileName)
         {
