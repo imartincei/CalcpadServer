@@ -8,7 +8,7 @@ namespace CalcpadViewer.ViewModels;
 
 public class MainViewModel : INotifyPropertyChanged
 {
-    private readonly IUserService? _userService;
+    private IUserService? _userService;
     
     // Observable collections for data binding
     public ObservableCollection<User> Users { get; } = new();
