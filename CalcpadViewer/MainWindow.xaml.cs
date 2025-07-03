@@ -237,7 +237,6 @@ public partial class MainWindow : Window
                     System.Diagnostics.Debug.WriteLine("FilesTab selected");
                     if (_minioClient != null)
                     {
-                        await LoadTagFilterOptions();
                         // Only reload files if the list is empty (first time switching to tab)
                         if (_viewModel.AllFiles.Count == 0)
                         {
@@ -251,72 +250,30 @@ public partial class MainWindow : Window
         }
     }
 
-    private void TagFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        // Debug: Log when this event is triggered
-        System.Diagnostics.Debug.WriteLine($"TagFilterComboBox_SelectionChanged - SelectedItem: {TagFilterComboBox.SelectedItem}");
-        
-        if (TagFilterComboBox.SelectedItem is PreDefinedTag selectedTag)
-        {
-            _viewModel.CurrentTagFilter = selectedTag;
-        }
-        else
-        {
-            _viewModel.CurrentTagFilter = null;
-        }
-        FilterFilesByCategory();
-    }
 
     private void ClearTagFilterButton_Click(object sender, RoutedEventArgs e)
     {
-        TagFilterComboBox.SelectedItem = null;
-        _viewModel.CurrentTagFilter = null;
-        _viewModel.SelectedTagFilters.Clear();
-        
-        // Clear all checkboxes in multi-tag mode
-        foreach (CheckBox checkBox in FindVisualChildren<CheckBox>(MultiTagFilterListBox))
+        // Clear the multi-select ComboBox
+        var listBox = (ListBox)MultiTagFilterComboBox.Template.FindName("lstBox", MultiTagFilterComboBox);
+        if (listBox != null)
         {
-            checkBox.IsChecked = false;
+            listBox.SelectedItems.Clear();
         }
         
+        _viewModel.SelectedTagFilters.Clear();
         FilterFilesByCategory();
     }
     
-    private void MultiTagCheckBox_Changed(object sender, RoutedEventArgs e)
+    private void MultiSelectListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (sender is CheckBox checkBox && checkBox.Tag is PreDefinedTag tag)
+        if (sender is ListBox listBox)
         {
-            if (checkBox.IsChecked == true)
+            // Update the ViewModel's SelectedTagFilters collection
+            _viewModel.SelectedTagFilters.Clear();
+            
+            foreach (PreDefinedTag tag in listBox.SelectedItems)
             {
-                if (!_viewModel.SelectedTagFilters.Contains(tag))
-                {
-                    _viewModel.SelectedTagFilters.Add(tag);
-                }
-            }
-            else
-            {
-                _viewModel.SelectedTagFilters.Remove(tag);
-            }
-        }
-    }
-    
-    // Helper method to find visual children
-    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
-    {
-        if (depObj != null)
-        {
-            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
-            {
-                DependencyObject child = VisualTreeHelper.GetChild(depObj, i);
-                if (child != null && child is T)
-                {
-                    yield return (T)child;
-                }
-
-                foreach (T childOfChild in FindVisualChildren<T>(child))
-                {
-                    yield return childOfChild;
-                }
+                _viewModel.SelectedTagFilters.Add(tag);
             }
         }
     }
@@ -416,26 +373,7 @@ public partial class MainWindow : Window
                 });
             }
 
-            // Further filter by tag if a tag filter is selected
-            if (_viewModel.CurrentTagFilter != null && !string.IsNullOrEmpty(_viewModel.CurrentTagFilter.Name))
-            {
-                System.Diagnostics.Debug.WriteLine($"Filtering by tag: {_viewModel.CurrentTagFilter.Name}");
-                filteredFiles = filteredFiles.Where(f => 
-                {
-                    try
-                    {
-                        if (f?.Tags == null) return false;
-                        return f.Tags.Values.Any(tagValue => 
-                            !string.IsNullOrEmpty(tagValue) && 
-                            tagValue.Equals(_viewModel.CurrentTagFilter.Name, StringComparison.OrdinalIgnoreCase));
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error in tag filter: {ex.Message}");
-                        return false;
-                    }
-                });
-            }
+            // Tag filtering is now handled by the ViewModel
 
             System.Diagnostics.Debug.WriteLine("Adding filtered files to _viewModel.Files collection");
             foreach(var file in filteredFiles) _viewModel.Files.Add(file);
@@ -482,9 +420,9 @@ public partial class MainWindow : Window
             }
 
             var filterText = _viewModel.CurrentCategoryFilter;
-            if (_viewModel.CurrentTagFilter != null)
+            if (_viewModel.SelectedTagFilters.Count > 0)
             {
-                filterText += $", Tag: {_viewModel.CurrentTagFilter.Name}";
+                filterText += $", Tags: {string.Join(", ", _viewModel.SelectedTagFilters.Select(t => t.Name))}";
             }
             _viewModel.StatusText = $"Showing {_viewModel.Files.Count} files ({filterText})";
         }
@@ -495,65 +433,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task LoadTagFilterOptions()
-    {
-        System.Diagnostics.Debug.WriteLine("LoadTagFilterOptions called");
-        
-        if (_userService == null) 
-        {
-            System.Diagnostics.Debug.WriteLine("_userService is null - cannot load tag filter options");
-            return;
-        }
-
-        try
-        {
-            // Remember the currently selected tag to restore after updating ItemsSource
-            var currentTagFilterName = _viewModel.CurrentTagFilter?.Name;
-            System.Diagnostics.Debug.WriteLine($"Current tag filter: {currentTagFilterName ?? "none"}");
-            
-            System.Diagnostics.Debug.WriteLine("Calling GetAllTagsAsync...");
-            var tags = await _userService.GetAllTagsAsync();
-            System.Diagnostics.Debug.WriteLine($"Retrieved {tags?.Count ?? 0} tags");
-            
-            if (tags != null)
-            {
-                foreach (var tag in tags)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Tag: {tag?.Name ?? "null"}");
-                }
-            }
-            
-            // Temporarily disable the selection changed event to prevent triggering filter
-            TagFilterComboBox.SelectionChanged -= TagFilterComboBox_SelectionChanged;
-            TagFilterComboBox.ItemsSource = tags;
-            
-            // Restore the previously selected tag if it still exists
-            if (!string.IsNullOrEmpty(currentTagFilterName) && tags != null)
-            {
-                var tagToReselect = tags.FirstOrDefault(t => t.Name == currentTagFilterName);
-                if (tagToReselect != null)
-                {
-                    TagFilterComboBox.SelectedItem = tagToReselect;
-                    _viewModel.CurrentTagFilter = tagToReselect;
-                    System.Diagnostics.Debug.WriteLine($"Restored tag filter selection: {tagToReselect.Name}");
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine($"Previously selected tag '{currentTagFilterName}' no longer exists");
-                    _viewModel.CurrentTagFilter = null;
-                }
-            }
-            
-            // Re-enable the selection changed event
-            TagFilterComboBox.SelectionChanged += TagFilterComboBox_SelectionChanged;
-            
-            System.Diagnostics.Debug.WriteLine("Set TagFilterComboBox.ItemsSource and restored selection");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Failed to load tag filter options: {ex.Message}");
-        }
-    }
 
     private async Task<BlobMetadata> GetFileMetadata(string fileName, string bucketName)
     {

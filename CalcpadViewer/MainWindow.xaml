@@ -2,6 +2,83 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Calcpad File Viewer" Height="600" Width="1000">
+    <Window.Resources>
+        <!-- ToggleButton Style for ComboBox -->
+        <Style x:Key="ToggleButtonStyle1" TargetType="{x:Type ToggleButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                        <Border x:Name="Border" Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1" CornerRadius="2">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition />
+                                    <ColumnDefinition Width="20" />
+                                </Grid.ColumnDefinitions>
+                                <Path x:Name="Arrow" Grid.Column="1" Fill="Black" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Data="M 0 0 L 4 4 L 8 0 Z"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="true">
+                                <Setter TargetName="Border" Property="Background" Value="LightBlue"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="true">
+                                <Setter TargetName="Border" Property="Background" Value="LightGray"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Multi-Select ComboBox Style -->
+        <Style x:Key="MultiSelectComboBox" TargetType="{x:Type ComboBox}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid SnapsToDevicePixels="true" x:Name="MainGrid" Height="Auto" Width="Auto">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="0"/>
+                            </Grid.ColumnDefinitions>
+                            <Popup AllowsTransparency="true" IsOpen="{Binding Path=IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                                   Placement="Bottom" PopupAnimation="{DynamicResource {x:Static SystemParameters.ComboBoxPopupAnimationKey}}"
+                                   Margin="1" x:Name="PART_Popup" Grid.ColumnSpan="2">
+                                <Border x:Name="DropDownBorder" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{Binding Path=ActualWidth, ElementName=MainGrid}"
+                                        Background="White" BorderBrush="Gray" BorderThickness="1">
+                                    <ScrollViewer CanContentScroll="true">
+                                        <ListBox x:Name="lstBox" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                                 KeyboardNavigation.DirectionalNavigation="Contained" SelectionMode="Multiple" 
+                                                 ItemsSource="{TemplateBinding ItemsSource}"
+                                                 DisplayMemberPath="{TemplateBinding DisplayMemberPath}"
+                                                 SelectionChanged="MultiSelectListBox_SelectionChanged"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                            <ToggleButton Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Grid.ColumnSpan="2"
+                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
+                                          Style="{StaticResource ToggleButtonStyle1}"/>
+                            <ItemsControl IsHitTestVisible="false" ItemsSource="{Binding Path=SelectedItems, ElementName=lstBox}" Margin="4,0,20,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel IsItemsHost="True" Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Background="LightBlue" CornerRadius="3" Margin="2" Padding="4,2">
+                                            <TextBlock Text="{Binding Name}" FontSize="10"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -89,59 +166,14 @@
                             
                             <!-- Tag Filter -->
                             <GroupBox Header="Filter by Tag" Grid.Row="1" Margin="5,0,5,5">
-                                <StackPanel>
-                                    <!-- Filter Mode Toggle -->
-                                    <StackPanel Orientation="Horizontal" Margin="5">
-                                        <CheckBox x:Name="MultiTagFilterCheckBox" Content="Multi-Tag Selection" 
-                                                  IsChecked="{Binding IsMultiTagFilterEnabled}" Margin="0,0,10,0"/>
-                                        <Button x:Name="ClearTagFilterButton" Content="Clear Filter" 
-                                                Padding="5,2" Click="ClearTagFilterButton_Click"/>
-                                    </StackPanel>
-                                    
-                                    <!-- Single Tag Selection (ComboBox) -->
-                                    <ComboBox x:Name="TagFilterComboBox" Width="200" Margin="5"
+                                <StackPanel Orientation="Horizontal" Margin="5">
+                                    <ComboBox x:Name="MultiTagFilterComboBox" Width="250" Margin="5"
                                               ItemsSource="{Binding Tags}"
-                                              SelectedItem="{Binding CurrentTagFilter}">
-                                        <ComboBox.Style>
-                                            <Style TargetType="ComboBox">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsMultiTagFilterEnabled}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ComboBox.Style>
-                                        <ComboBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding Name}"/>
-                                            </DataTemplate>
-                                        </ComboBox.ItemTemplate>
-                                    </ComboBox>
-                                    
-                                    <!-- Multi Tag Selection (ListBox with CheckBoxes) -->
-                                    <ListBox x:Name="MultiTagFilterListBox" MaxHeight="120" Margin="5"
-                                             ItemsSource="{Binding Tags}"
-                                             SelectionMode="Multiple">
-                                        <ListBox.Style>
-                                            <Style TargetType="ListBox">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsMultiTagFilterEnabled}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ListBox.Style>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <CheckBox Content="{Binding Name}" 
-                                                          Tag="{Binding}"
-                                                          Checked="MultiTagCheckBox_Changed"
-                                                          Unchecked="MultiTagCheckBox_Changed"/>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
+                                              DisplayMemberPath="Name"
+                                              Style="{StaticResource MultiSelectComboBox}"
+                                              MaxDropDownHeight="150"/>
+                                    <Button x:Name="ClearTagFilterButton" Content="Clear Filter" 
+                                            Padding="10,5" Click="ClearTagFilterButton_Click"/>
                                 </StackPanel>
                             </GroupBox>
                             
