@@ -201,11 +201,23 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             
-                            <StackPanel Grid.Row="0" Orientation="Horizontal">
-                                <Button x:Name="RefreshTagsButton" Content="Refresh" 
-                                        Margin="5" Padding="5" Click="RefreshTagsButton_Click"/>
-                                <Button x:Name="AddTagButton" Content="Add Tag" 
-                                        Margin="0,5,5,5" Padding="5" Click="AddTagButton_Click"/>
+                            <StackPanel Grid.Row="0">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Button x:Name="RefreshTagsButton" Content="Refresh" 
+                                            Margin="5" Padding="5" Click="RefreshTagsButton_Click"/>
+                                </StackPanel>
+                                
+                                <!-- Add Tag Inline -->
+                                <StackPanel Orientation="Horizontal" Margin="5">
+                                    <TextBox x:Name="NewTagTextBox" Width="200" Margin="0,0,5,0" 
+                                             KeyDown="NewTagTextBox_KeyDown" 
+                                             TextChanged="NewTagTextBox_TextChanged"
+                                             MaxLength="100"
+                                             ToolTip="Enter tag name and press Enter"/>
+                                    <Button x:Name="AddTagButton" Content="Add" 
+                                            Padding="10,3" Click="AddTagButton_Click"
+                                            IsEnabled="False"/>
+                                </StackPanel>
                             </StackPanel>
                             
                             <ListBox x:Name="TagsListBox" Grid.Row="1" Margin="5" 

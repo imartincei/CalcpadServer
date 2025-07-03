@@ -918,19 +918,53 @@ public partial class MainWindow : Window
 
     private async void AddTagButton_Click(object sender, RoutedEventArgs e)
     {
+        await AddTagFromTextBox();
+    }
+
+    private void NewTagTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+        {
+            e.Handled = true;
+            AddTagButton_Click(sender, e);
+        }
+    }
+
+    private void NewTagTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        // Enable/disable button based on text content
+        AddTagButton.IsEnabled = !string.IsNullOrWhiteSpace(NewTagTextBox.Text);
+    }
+
+    private async Task AddTagFromTextBox()
+    {
         if (_userService == null)
         {
             MessageBox.Show("User service not initialized. Please connect first.", "Service Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var addTagDialog = new AddTagDialog();
-        addTagDialog.Owner = this;
-
-        if (addTagDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(addTagDialog.TagName))
+        var tagName = NewTagTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(tagName))
         {
-            await CreateTag(addTagDialog.TagName);
+            MessageBox.Show("Please enter a tag name.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            NewTagTextBox.Focus();
+            return;
         }
+
+        if (tagName.Length > 100)
+        {
+            MessageBox.Show("Tag name cannot exceed 100 characters.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            NewTagTextBox.Focus();
+            return;
+        }
+
+        await CreateTag(tagName);
+        
+        // Clear the text box after successful creation
+        NewTagTextBox.Clear();
+        AddTagButton.IsEnabled = false;
+        NewTagTextBox.Focus();
     }
 
     private void TagsListBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)

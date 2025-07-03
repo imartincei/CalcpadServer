@@ -5,6 +5,7 @@ using System.Text;
 using CalcpadServer.Api.Data;
 using CalcpadServer.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CalcpadServer.Api.Services;
@@ -28,12 +29,18 @@ public class UserService : IUserService
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<UserService> _logger;
+    private readonly AuthenticationConfig _authConfig;
 
-    public UserService(ApplicationDbContext context, IConfiguration configuration, ILogger<UserService> logger)
+    public UserService(
+        ApplicationDbContext context, 
+        IConfiguration configuration, 
+        ILogger<UserService> logger,
+        IOptions<AuthenticationConfig> authConfig)
     {
         _context = context;
         _configuration = configuration;
         _logger = logger;
+        _authConfig = authConfig.Value;
     }
 
     public async Task EnsureDefaultAdminAsync()
@@ -225,15 +232,19 @@ public class UserService : IUserService
     {
         try
         {
+            var jwtConfig = _authConfig.Local.Jwt;
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Secret"] ?? "calcpad-jwt-secret-key-change-in-production-minimum-32-characters");
+            var key = Encoding.ASCII.GetBytes(jwtConfig.Secret);
             
             tokenHandler.ValidateToken(token, new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(key),
-                ValidateIssuer = false,
-                ValidateAudience = false,
+                ValidateIssuer = !string.IsNullOrEmpty(jwtConfig.Issuer),
+                ValidIssuer = jwtConfig.Issuer,
+                ValidateAudience = !string.IsNullOrEmpty(jwtConfig.Audience),
+                ValidAudience = jwtConfig.Audience,
+                ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
             }, out SecurityToken validatedToken);
 
@@ -264,8 +275,10 @@ public class UserService : IUserService
 
     private string GenerateJwtToken(User user)
     {
+        var jwtConfig = _authConfig.Local.Jwt;
         var tokenHandler = new JwtSecurityTokenHandler();
-        var key = Encoding.ASCII.GetBytes(_configuration["Jwt:Secret"] ?? "calcpad-jwt-secret-key-change-in-production-minimum-32-characters");
+        var key = Encoding.ASCII.GetBytes(jwtConfig.Secret);
+        
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(new[]
@@ -275,9 +288,12 @@ public class UserService : IUserService
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, user.Role.ToString())
             }),
-            Expires = DateTime.UtcNow.AddHours(24),
+            Expires = DateTime.UtcNow.AddHours(jwtConfig.ExpiryInHours),
+            Issuer = jwtConfig.Issuer,
+            Audience = jwtConfig.Audience,
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
         };
+        
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
     }

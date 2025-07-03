@@ -37,6 +37,40 @@ services:
       echo 'Buckets created and versioning enabled successfully'
       "
 
+  sqlite-init:
+    image: alpine:latest
+    volumes:
+      - calcpad-db:/data
+    entrypoint: >
+      /bin/sh -c "
+      apk add --no-cache sqlite &&
+      echo 'Initializing SQLite database...' &&
+      sqlite3 /data/calcpad.db '
+      CREATE TABLE IF NOT EXISTS Users (
+        Id TEXT PRIMARY KEY,
+        Username TEXT NOT NULL UNIQUE,
+        Email TEXT NOT NULL UNIQUE,
+        PasswordHash TEXT NOT NULL,
+        Role INTEGER NOT NULL DEFAULT 2,
+        CreatedAt TEXT NOT NULL,
+        LastLoginAt TEXT,
+        IsActive INTEGER NOT NULL DEFAULT 1
+      );
+      CREATE INDEX IF NOT EXISTS IX_Users_Username ON Users (Username);
+      CREATE INDEX IF NOT EXISTS IX_Users_Email ON Users (Email);
+      
+      CREATE TABLE IF NOT EXISTS PreDefinedTags (
+        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+        Name TEXT NOT NULL UNIQUE
+      );
+      CREATE INDEX IF NOT EXISTS IX_PreDefinedTags_Name ON PreDefinedTags (Name);
+      
+      INSERT OR IGNORE INTO Users (Id, Username, Email, PasswordHash, Role, CreatedAt, IsActive)
+      VALUES (\"admin-default-id\", \"admin\", \"admin@calcpad.local\", \"\$2a\$11\$N2JmZWVhZGVhNWI4NDdlO.xK8RP.xZJmXKCJ0KdWvXQG3K8J8K8J8K\", 3, datetime(\"now\"), 1);
+      ' &&
+      echo 'SQLite database initialized successfully'
+      "
+
   calcpad-api:
     image: mcr.microsoft.com/dotnet/sdk:8.0
     container_name: calcpad-api
@@ -50,8 +84,14 @@ services:
     depends_on:
       - minio
       - minio-init
+      - sqlite-init
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      # Override auth provider via environment variables
+      # - Authentication__Provider=OIDC
+      # - Authentication__OIDC__Authority=https://your-sso-provider.com
+      # - Authentication__OIDC__ClientId=calcpad-client
+      # - Authentication__OIDC__ClientSecret=your-client-secret
 
 volumes:
   minio-data:
