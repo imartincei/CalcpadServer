@@ -143,10 +143,26 @@ public partial class MainWindow : Window
 
     private void CategoryTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // Debug: Log when category selection changes
+        System.Diagnostics.Debug.WriteLine($"CategoryTabControl_SelectionChanged called");
+        System.Diagnostics.Debug.WriteLine($"Sender: {sender?.GetType().Name}");
+        
         if (sender is TabControl tabControl && tabControl.SelectedItem is TabItem selectedTab)
         {
-            _currentCategoryFilter = selectedTab.Header.ToString() ?? "All";
-            FilterFilesByCategory();
+            var newCategoryFilter = selectedTab.Header.ToString() ?? "All";
+            System.Diagnostics.Debug.WriteLine($"Category changing from '{_currentCategoryFilter}' to '{newCategoryFilter}'");
+            
+            // Only filter if the category actually changed
+            if (_currentCategoryFilter != newCategoryFilter)
+            {
+                _currentCategoryFilter = newCategoryFilter;
+                System.Diagnostics.Debug.WriteLine("Category filter changed - calling FilterFilesByCategory");
+                FilterFilesByCategory();
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("Category filter unchanged - skipping FilterFilesByCategory");
+            }
         }
     }
 
@@ -170,13 +186,17 @@ public partial class MainWindow : Window
                         await LoadTags();
                     break;
                 case "FilesTab":
-                    // Temporarily disabled auto-refresh to debug selection issue
-                    // if (_minioClient != null)
-                    // {
-                    //     await LoadFiles();
-                    //     await LoadTagFilterOptions();
-                    // }
-                    System.Diagnostics.Debug.WriteLine("FilesTab selected - auto-refresh disabled for debugging");
+                    System.Diagnostics.Debug.WriteLine("FilesTab selected");
+                    if (_minioClient != null)
+                    {
+                        await LoadTagFilterOptions();
+                        // Only reload files if the list is empty (first time switching to tab)
+                        if (_allFiles.Count == 0)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Loading files for first time");
+                            await LoadFiles();
+                        }
+                    }
                     break;
                 // Start tab doesn't need refresh
             }
@@ -382,16 +402,33 @@ public partial class MainWindow : Window
 
     private async Task LoadTagFilterOptions()
     {
-        if (_userService == null) return;
+        System.Diagnostics.Debug.WriteLine("LoadTagFilterOptions called");
+        
+        if (_userService == null) 
+        {
+            System.Diagnostics.Debug.WriteLine("_userService is null - cannot load tag filter options");
+            return;
+        }
 
         try
         {
+            System.Diagnostics.Debug.WriteLine("Calling GetAllTagsAsync...");
             var tags = await _userService.GetAllTagsAsync();
+            System.Diagnostics.Debug.WriteLine($"Retrieved {tags?.Count ?? 0} tags");
+            
+            if (tags != null)
+            {
+                foreach (var tag in tags)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Tag: {tag?.Name ?? "null"}");
+                }
+            }
+            
             TagFilterComboBox.ItemsSource = tags;
+            System.Diagnostics.Debug.WriteLine("Set TagFilterComboBox.ItemsSource");
         }
         catch (Exception ex)
         {
-            // Silently fail if we can't load tags for filtering
             System.Diagnostics.Debug.WriteLine($"Failed to load tag filter options: {ex.Message}");
         }
     }
