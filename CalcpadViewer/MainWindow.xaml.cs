@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private IUserService? _userService;
     private User? _currentUser;
     private MainViewModel _viewModel;
+    
 
     public MainWindow()
     {
@@ -146,12 +147,12 @@ public partial class MainWindow : Window
         if (sender is TabControl tabControl && tabControl.SelectedItem is TabItem selectedTab)
         {
             var newCategoryFilter = selectedTab.Header.ToString() ?? "All";
-            System.Diagnostics.Debug.WriteLine($"Category changing from '{_currentCategoryFilter}' to '{newCategoryFilter}'");
+            System.Diagnostics.Debug.WriteLine($"Category changing from '{_viewModel.CurrentCategoryFilter}' to '{newCategoryFilter}'");
             
             // Only filter if the category actually changed
-            if (_currentCategoryFilter != newCategoryFilter)
+            if (_viewModel.CurrentCategoryFilter != newCategoryFilter)
             {
-                _currentCategoryFilter = newCategoryFilter;
+                _viewModel.CurrentCategoryFilter = newCategoryFilter;
                 System.Diagnostics.Debug.WriteLine("Category filter changed - calling FilterFilesByCategory");
                 FilterFilesByCategory();
             }
@@ -218,7 +219,7 @@ public partial class MainWindow : Window
     private void ClearTagFilterButton_Click(object sender, RoutedEventArgs e)
     {
         TagFilterComboBox.SelectedItem = null;
-        _currentTagFilter = null;
+        _viewModel.CurrentTagFilter = null;
         FilterFilesByCategory();
     }
 
@@ -232,9 +233,9 @@ public partial class MainWindow : Window
             System.Diagnostics.Debug.WriteLine("LoadFiles called");
             System.Diagnostics.Debug.WriteLine($"LoadFiles call stack: {Environment.StackTrace}");
             
-            StatusText.Text = "Loading files...";
+            _viewModel.StatusText = "Loading files...";
             RefreshButton.IsEnabled = false;
-            _allFiles.Clear();
+            _viewModel.AllFiles.Clear();
 
             // Load files from working bucket
             var workingListObjectsArgs = new ListObjectsArgs()
@@ -244,7 +245,7 @@ public partial class MainWindow : Window
             await foreach (var item in _minioClient.ListObjectsEnumAsync(workingListObjectsArgs))
             {
                 var metadata = await GetFileMetadata(item.Key, _workingBucketName);
-                _allFiles.Add(metadata);
+                _viewModel.AllFiles.Add(metadata);
             }
 
             // Load files from stable bucket
@@ -255,10 +256,10 @@ public partial class MainWindow : Window
             await foreach (var item in _minioClient.ListObjectsEnumAsync(stableListObjectsArgs))
             {
                 var metadata = await GetFileMetadata(item.Key, _stableBucketName);
-                _allFiles.Add(metadata);
+                _viewModel.AllFiles.Add(metadata);
             }
 
-            StatusText.Text = $"Loaded {_allFiles.Count} files";
+            _viewModel.StatusText = $"Loaded {_viewModel.AllFiles.Count} files";
             FilterFilesByCategory();
         }
         catch (Exception ex)
@@ -284,30 +285,30 @@ public partial class MainWindow : Window
             var currentlySelectedFile = FilesListBox.SelectedItem as string;
             
             FilesListBox.Items.Clear();
-            _files.Clear();
+            _viewModel.Files.Clear();
 
             // Start with all files or filter by category
             IEnumerable<BlobMetadata> filteredFiles;
-            if (_allFiles == null)
+            if (_viewModel.AllFiles == null)
             {
-                System.Diagnostics.Debug.WriteLine("_allFiles is null");
+                System.Diagnostics.Debug.WriteLine("_viewModel.AllFiles is null");
                 filteredFiles = Enumerable.Empty<BlobMetadata>();
             }
-            else if (_currentCategoryFilter == "All")
+            else if (_viewModel.CurrentCategoryFilter == "All")
             {
                 System.Diagnostics.Debug.WriteLine("Using all files filter");
-                filteredFiles = _allFiles;
+                filteredFiles = _viewModel.AllFiles;
             }
             else
             {
-                System.Diagnostics.Debug.WriteLine($"Filtering by category: {_currentCategoryFilter}");
-                filteredFiles = _allFiles.Where(f => 
+                System.Diagnostics.Debug.WriteLine($"Filtering by category: {_viewModel.CurrentCategoryFilter}");
+                filteredFiles = _viewModel.AllFiles.Where(f => 
                 {
                     try
                     {
                         if (f?.Metadata == null) return false;
                         var category = f.Metadata.ContainsKey("file-category") ? f.Metadata["file-category"] : "Unknown";
-                        return category?.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase) == true;
+                        return category?.Equals(_viewModel.CurrentCategoryFilter, StringComparison.OrdinalIgnoreCase) == true;
                     }
                     catch (Exception ex)
                     {
@@ -338,11 +339,11 @@ public partial class MainWindow : Window
                 });
             }
 
-            System.Diagnostics.Debug.WriteLine("Adding filtered files to _files collection");
-            _files.AddRange(filteredFiles);
+            System.Diagnostics.Debug.WriteLine("Adding filtered files to _viewModel.Files collection");
+            foreach(var file in filteredFiles) _viewModel.Files.Add(file);
 
             // Add files to display without category brackets
-            foreach (var file in _files)
+            foreach (var file in _viewModel.Files)
             {
                 if (!string.IsNullOrEmpty(file?.FileName))
                 {
@@ -387,7 +388,7 @@ public partial class MainWindow : Window
             {
                 filterText += $", Tag: {_currentTagFilter.Name}";
             }
-            StatusText.Text = $"Showing {_files.Count} files ({filterText})";
+            _viewModel.StatusText = $"Showing {_viewModel.Files.Count} files ({filterText})";
         }
         catch (Exception ex)
         {
@@ -409,7 +410,7 @@ public partial class MainWindow : Window
         try
         {
             // Remember the currently selected tag to restore after updating ItemsSource
-            var currentTagFilterName = _currentTagFilter?.Name;
+            var currentTagFilterName = _viewModel.CurrentTagFilter?.Name;
             System.Diagnostics.Debug.WriteLine($"Current tag filter: {currentTagFilterName ?? "none"}");
             
             System.Diagnostics.Debug.WriteLine("Calling GetAllTagsAsync...");
@@ -435,13 +436,13 @@ public partial class MainWindow : Window
                 if (tagToReselect != null)
                 {
                     TagFilterComboBox.SelectedItem = tagToReselect;
-                    _currentTagFilter = tagToReselect;
+                    _viewModel.CurrentTagFilter = tagToReselect;
                     System.Diagnostics.Debug.WriteLine($"Restored tag filter selection: {tagToReselect.Name}");
                 }
                 else
                 {
                     System.Diagnostics.Debug.WriteLine($"Previously selected tag '{currentTagFilterName}' no longer exists");
-                    _currentTagFilter = null;
+                    _viewModel.CurrentTagFilter = null;
                 }
             }
             
@@ -526,7 +527,7 @@ public partial class MainWindow : Window
     {
         if (FilesListBox.SelectedItem is string selectedFileName)
         {
-            var fileMetadata = _files.FirstOrDefault(f => f.FileName == selectedFileName);
+            var fileMetadata = _viewModel.Files.FirstOrDefault(f => f.FileName == selectedFileName);
             if (fileMetadata != null)
             {
                 DisplayFileMetadata(fileMetadata);
@@ -541,7 +542,7 @@ public partial class MainWindow : Window
     private (string fileName, string bucketName) ExtractFileInfoFromDisplayName(string fileName)
     {
         // Find the file metadata to determine the bucket
-        var fileMetadata = _files.FirstOrDefault(f => f.FileName == fileName);
+        var fileMetadata = _viewModel.Files.FirstOrDefault(f => f.FileName == fileName);
         if (fileMetadata != null)
         {
             var category = fileMetadata.Metadata.ContainsKey("file-category") ? fileMetadata.Metadata["file-category"] : "Unknown";
@@ -782,19 +783,19 @@ public partial class MainWindow : Window
     {
         if (UsersDataGrid.SelectedItem is User selectedUser)
         {
-            _selectedUser = selectedUser;
+            _viewModel.SelectedUser = selectedUser;
             DisplayUserDetails(selectedUser);
         }
         else
         {
-            _selectedUser = null;
+            _viewModel.SelectedUser = null;
             ClearUserDetailsDisplay();
         }
     }
 
     private async void UpdateUserButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedUser == null || _userService == null) return;
+        if (_viewModel.SelectedUser == null || _userService == null) return;
 
         var selectedRoleItem = UserRoleComboBox.SelectedItem as ComboBoxItem;
         if (selectedRoleItem == null) return;
@@ -805,22 +806,22 @@ public partial class MainWindow : Window
             IsActive = UserActiveCheckBox.IsChecked == true
         };
 
-        await UpdateUser(_selectedUser.Id, updateRequest);
+        await UpdateUser(_viewModel.SelectedUser.Id, updateRequest);
     }
 
     private async void DeleteUserButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedUser == null || _userService == null) return;
+        if (_viewModel.SelectedUser == null || _userService == null) return;
 
         var result = MessageBox.Show(
-            $"Are you sure you want to delete user '{_selectedUser.Username}'?", 
+            $"Are you sure you want to delete user '{_viewModel.SelectedUser.Username}'?", 
             "Confirm Delete", 
             MessageBoxButton.YesNo, 
             MessageBoxImage.Question);
 
         if (result == MessageBoxResult.Yes)
         {
-            await DeleteUser(_selectedUser.Id);
+            await DeleteUser(_viewModel.SelectedUser.Id);
         }
     }
 
@@ -943,7 +944,7 @@ public partial class MainWindow : Window
         NoUserSelectionText.Visibility = Visibility.Visible;
         UserDetailsGroup.Visibility = Visibility.Collapsed;
         UserActionsGroup.Visibility = Visibility.Collapsed;
-        _selectedUser = null;
+        _viewModel.SelectedUser = null;
     }
 
     private async void DownloadButton_Click(object sender, RoutedEventArgs e)
@@ -1184,29 +1185,29 @@ public partial class MainWindow : Window
     {
         if (TagsListBox.SelectedItem is PreDefinedTag selectedTag)
         {
-            _selectedTag = selectedTag;
+            _viewModel.SelectedTag = selectedTag;
             DisplayTagDetails(selectedTag);
         }
         else
         {
-            _selectedTag = null;
+            _viewModel.SelectedTag = null;
             ClearTagDetailsDisplay();
         }
     }
 
     private async void DeleteTagButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedTag == null || _userService == null) return;
+        if (_viewModel.SelectedTag == null || _userService == null) return;
 
         var result = MessageBox.Show(
-            $"Are you sure you want to delete tag '{_selectedTag.Name}'?\n\nThis will also remove the tag from all files that currently have it.", 
+            $"Are you sure you want to delete tag '{_viewModel.SelectedTag.Name}'?\n\nThis will also remove the tag from all files that currently have it.", 
             "Confirm Delete", 
             MessageBoxButton.YesNo, 
             MessageBoxImage.Question);
 
         if (result == MessageBoxResult.Yes)
         {
-            await DeleteTag(_selectedTag.Id);
+            await DeleteTag(_viewModel.SelectedTag.Id);
         }
     }
 
@@ -1248,7 +1249,7 @@ public partial class MainWindow : Window
             DeleteTagButton.IsEnabled = false;
 
             // Get the tag name before deletion for searching files
-            var tagToDelete = _selectedTag;
+            var tagToDelete = _viewModel.SelectedTag;
             if (tagToDelete == null) return;
 
             StatusText.Text = "Removing tag from files...";
@@ -1397,6 +1398,6 @@ public partial class MainWindow : Window
         NoTagSelectionText.Visibility = Visibility.Visible;
         TagDetailsGroup.Visibility = Visibility.Collapsed;
         TagActionsGroup.Visibility = Visibility.Collapsed;
-        _selectedTag = null;
+        _viewModel.SelectedTag = null;
     }
 }
