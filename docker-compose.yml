@@ -17,6 +17,23 @@ services:
       timeout: 20s
       retries: 3
 
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...' &&
+      until mc alias set minio http://minio:9000 calcpad-admin calcpad-password-123; do
+        echo 'MinIO not ready yet, waiting...' &&
+        sleep 2
+      done &&
+      echo 'MinIO is ready, creating buckets...' &&
+      mc mb minio/calcpad-storage-working --ignore-existing &&
+      mc mb minio/calcpad-storage-stable --ignore-existing &&
+      echo 'Buckets created successfully'
+      "
+
   calcpad-api:
     image: mcr.microsoft.com/dotnet/sdk:8.0
     container_name: calcpad-api
@@ -29,6 +46,7 @@ services:
     command: dotnet run --urls "http://0.0.0.0:5159"
     depends_on:
       - minio
+      - minio-init
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
 

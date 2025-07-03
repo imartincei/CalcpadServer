@@ -253,8 +253,48 @@ public class BlobStorageController : ControllerBase
         }
     }
 
+    [HttpGet("versions/{fileName}")]
+    public async Task<IActionResult> GetFileVersions(string fileName)
+    {
+        try
+        {
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
+            {
+                return NotFound($"File '{fileName}' not found");
+            }
 
+            var versions = await _blobStorageService.ListFileVersionsAsync(fileName, userContext);
+            return Ok(versions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting versions for file {FileName}", fileName);
+            return StatusCode(500, "Internal server error");
+        }
+    }
 
+    [HttpGet("download/{fileName}/version/{versionId}")]
+    public async Task<IActionResult> DownloadFileVersion(string fileName, string versionId)
+    {
+        try
+        {
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
+            {
+                return NotFound($"File '{fileName}' not found");
+            }
 
-
+            var stream = await _blobStorageService.DownloadFileVersionAsync(fileName, versionId, userContext);
+            
+            return File(stream, "application/octet-stream", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading version {VersionId} of file {FileName}", versionId, fileName);
+            return StatusCode(500, "Internal server error");
+        }
+    }
 }

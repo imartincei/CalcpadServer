@@ -25,14 +25,12 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         
                         <!-- MinIO Settings -->
                         <Label Grid.Row="0" Grid.Column="0" Content="Endpoint:" VerticalAlignment="Center"/>
                         <TextBox x:Name="EndpointTextBox" Grid.Row="0" Grid.Column="1" Margin="5" Text="localhost:9000"/>
-                        
-                        <Label Grid.Row="0" Grid.Column="2" Content="Bucket:" VerticalAlignment="Center" Margin="10,0,0,0"/>
-                        <TextBox x:Name="BucketTextBox" Grid.Row="0" Grid.Column="3" Margin="5" Text="calcpad-storage"/>
                         
                         <Button x:Name="ConnectButton" Grid.Row="0" Grid.Column="4" Content="Connect" 
                                 Margin="10,5,0,5" Padding="10,5" Click="ConnectButton_Click"/>
@@ -81,6 +79,8 @@
                                         Margin="0,5,5,5" Padding="5" Click="UploadButton_Click" IsEnabled="False"/>
                                 <Button x:Name="DownloadButton" Content="Download File" 
                                         Margin="0,5,5,5" Padding="5" Click="DownloadButton_Click" IsEnabled="False"/>
+                                <Button x:Name="ViewVersionsButton" Content="View Versions" 
+                                        Margin="0,5,5,5" Padding="5" Click="ViewVersionsButton_Click" IsEnabled="False"/>
                                 <Button x:Name="DeleteButton" Content="Delete File" 
                                         Margin="0,5,5,5" Padding="5" Click="DeleteButton_Click" IsEnabled="False"
                                         Background="LightCoral"/>

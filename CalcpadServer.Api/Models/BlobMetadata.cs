@@ -40,6 +40,7 @@ public class MetadataRequest
     public string? ReviewedBy { get; set; }
     public string? TestedBy { get; set; }
     public DateTime? DateTested { get; set; }
+    public string? FileCategory { get; set; }
 }
 
 public class MetadataUpdateRequest
@@ -50,4 +51,13 @@ public class MetadataUpdateRequest
 public class TagsUpdateRequest
 {
     public Dictionary<string, string> Tags { get; set; } = new();
+}
+
+public class FileVersion
+{
+    public string VersionId { get; set; } = string.Empty;
+    public DateTime LastModified { get; set; }
+    public long Size { get; set; }
+    public bool IsLatest { get; set; }
+    public string ETag { get; set; } = string.Empty;
 }

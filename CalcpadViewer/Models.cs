@@ -56,3 +56,12 @@ public class UpdateUserRequest
     public UserRole Role { get; set; }
     public bool IsActive { get; set; }
 }
+
+public class FileVersion
+{
+    public string VersionId { get; set; } = string.Empty;
+    public DateTime LastModified { get; set; }
+    public long Size { get; set; }
+    public bool IsLatest { get; set; }
+    public string ETag { get; set; } = string.Empty;
+}

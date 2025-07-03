@@ -9,9 +9,11 @@ public interface IBlobStorageService
 {
     Task<string> UploadFileAsync(string baseFileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null);
     Task<Stream> DownloadFileAsync(string fileName, UserContext userContext);
+    Task<Stream> DownloadFileVersionAsync(string fileName, string versionId, UserContext userContext);
     Task<bool> DeleteFileAsync(string fileName, UserContext userContext);
     Task<IEnumerable<string>> ListFilesAsync(UserContext userContext);
     Task<IEnumerable<BlobMetadata>> ListFilesWithMetadataAsync(UserContext userContext);
+    Task<IEnumerable<FileVersion>> ListFileVersionsAsync(string fileName, UserContext userContext);
     Task<bool> FileExistsAsync(string fileName, UserContext userContext);
     Task<BlobMetadata> GetFileMetadataAsync(string fileName, UserContext userContext);
     Task<bool> SetFileTagsAsync(string fileName, Dictionary<string, string> tags, UserContext userContext);
@@ -22,18 +24,37 @@ public interface IBlobStorageService
 public class BlobStorageService(IMinioClient minioClient, IConfiguration configuration, ILogger<BlobStorageService> logger, IUserService userService) : IBlobStorageService
 {
     private readonly IMinioClient _minioClient = minioClient;
-    private readonly string _bucketName = configuration["MinIO:BucketName"] ?? "calcpad-storage-working";
+    private readonly string _bucketName = configuration["MinIO:BucketName"] ?? "calcpad-storage";
+    private readonly string _workingBucketName = GetWorkingBucketName(configuration["MinIO:BucketName"] ?? "calcpad-storage");
+    private readonly string _stableBucketName = GetStableBucketName(configuration["MinIO:BucketName"] ?? "calcpad-storage");
     private readonly ILogger<BlobStorageService> _logger = logger;
     private readonly IUserService _userService = userService;
+
+    private static string GetWorkingBucketName(string baseBucketName)
+    {
+        var bucketPrefix = baseBucketName.EndsWith("-storage") ? baseBucketName.Substring(0, baseBucketName.Length - 8) : baseBucketName;
+        return $"{bucketPrefix}-storage-working";
+    }
+
+    private static string GetStableBucketName(string baseBucketName)
+    {
+        var bucketPrefix = baseBucketName.EndsWith("-storage") ? baseBucketName.Substring(0, baseBucketName.Length - 8) : baseBucketName;
+        return $"{bucketPrefix}-storage-stable";
+    }
 
     public async Task<string> UploadFileAsync(string FileName, Stream fileStream, UserContext userContext, string contentType = "application/octet-stream", Dictionary<string, string>? tags = null, MetadataRequest? metadata = null)
     {
         try
         {
-            await EnsureBucketExistsAsync();
+            // Determine target bucket based on file category
+            var targetBucket = _stableBucketName; // Default to stable bucket
+            if (metadata?.FileCategory?.ToLower() == "working")
+            {
+                targetBucket = _workingBucketName;
+            }
             
             var putObjectArgs = new PutObjectArgs()
-                .WithBucket(_bucketName)
+                .WithBucket(targetBucket)
                 .WithObject(FileName)
                 .WithStreamData(fileStream)
                 .WithObjectSize(fileStream.Length)
@@ -46,14 +67,17 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
             var user = await _userService.GetUserByIdAsync(userContext.UserId);
             var userEmail = user?.Email ?? userContext.Username; // Fallback to username if email not found
             
+            // Auto-assign current date and user for created/updated fields
+            var currentDate = DateTime.UtcNow;
+            headers["x-amz-meta-date-created"] = currentDate.ToString("O");
+            headers["x-amz-meta-date-updated"] = currentDate.ToString("O");
+            headers["x-amz-meta-created-by"] = userEmail;
+            headers["x-amz-meta-updated-by"] = userEmail;
+            
             if (metadata != null)
             {
-                if (metadata.DateCreated.HasValue)
-                    headers["x-amz-meta-date-created"] = metadata.DateCreated.Value.ToString("O");
-                if (metadata.DateUpdated.HasValue)
-                    headers["x-amz-meta-date-updated"] = metadata.DateUpdated.Value.ToString("O");
-                if (!string.IsNullOrEmpty(metadata.UpdatedBy))
-                    headers["x-amz-meta-updated-by"] = metadata.UpdatedBy;
+                if (!string.IsNullOrEmpty(metadata.FileCategory))
+                    headers["x-amz-meta-file-category"] = metadata.FileCategory;
                 if (metadata.DateReviewed.HasValue)
                     headers["x-amz-meta-date-reviewed"] = metadata.DateReviewed.Value.ToString("O");
                 if (!string.IsNullOrEmpty(metadata.ReviewedBy))
@@ -64,8 +88,6 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
                     headers["x-amz-meta-date-tested"] = metadata.DateTested.Value.ToString("O");
             }
             
-            // Always set CreatedBy to the logged-in user's email
-            headers["x-amz-meta-created-by"] = userEmail;
             headers["x-amz-meta-created-by-user-id"] = userContext.UserId;
             headers["x-amz-meta-created-by-username"] = userContext.Username;
 
@@ -83,7 +105,7 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
                 await SetFileTagsAsync(FileName, tags, userContext);
             }
             
-            _logger.LogInformation("File {FileName} uploaded successfully", FileName);
+            _logger.LogInformation("File {FileName} uploaded successfully to bucket {BucketName}", FileName, targetBucket);
             return FileName;
         }
         catch (Exception ex)
@@ -97,7 +119,6 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
     {
         try
         {
-            await EnsureBucketExistsAsync();
             
             var putObjectArgs = new PutObjectArgs()
                 .WithBucket(_bucketName)
@@ -122,21 +143,92 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
     {
         try
         {
+            // Determine bucket based on file category from metadata
+            var targetBucket = await DetermineBucketForFile(fileName);
+            
             var memoryStream = new MemoryStream();
             var getObjectArgs = new GetObjectArgs()
-                .WithBucket(_bucketName)
+                .WithBucket(targetBucket)
                 .WithObject(fileName)
                 .WithCallbackStream(stream => stream.CopyTo(memoryStream));
 
             await _minioClient.GetObjectAsync(getObjectArgs);
             memoryStream.Position = 0;
             
-            _logger.LogInformation("File {FileName} downloaded successfully", fileName);
+            _logger.LogInformation("File {FileName} downloaded successfully from bucket {Bucket}", fileName, targetBucket);
             return memoryStream;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error downloading file {FileName}", fileName);
+            throw;
+        }
+    }
+
+    public async Task<Stream> DownloadFileVersionAsync(string fileName, string versionId, UserContext userContext)
+    {
+        try
+        {
+            // Determine bucket based on file category from metadata
+            var targetBucket = await DetermineBucketForFile(fileName);
+            
+            var memoryStream = new MemoryStream();
+            var getObjectArgs = new GetObjectArgs()
+                .WithBucket(targetBucket)
+                .WithObject(fileName)
+                .WithVersionId(versionId)
+                .WithCallbackStream(stream => stream.CopyTo(memoryStream));
+
+            await _minioClient.GetObjectAsync(getObjectArgs);
+            memoryStream.Position = 0;
+            
+            _logger.LogInformation("File {FileName} version {VersionId} downloaded successfully from bucket {Bucket}", fileName, versionId, targetBucket);
+            return memoryStream;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading file {FileName} version {VersionId}", fileName, versionId);
+            throw;
+        }
+    }
+
+    public async Task<IEnumerable<FileVersion>> ListFileVersionsAsync(string fileName, UserContext userContext)
+    {
+        try
+        {
+            // Determine bucket based on file category from metadata
+            var targetBucket = await DetermineBucketForFile(fileName);
+            
+            var versions = new List<FileVersion>();
+            var listObjectsArgs = new ListObjectsArgs()
+                .WithBucket(targetBucket)
+                .WithPrefix(fileName)
+                .WithVersions(true);
+
+            await foreach (var item in _minioClient.ListObjectsEnumAsync(listObjectsArgs))
+            {
+                if (item.Key == fileName) // Exact match only
+                {
+                    versions.Add(new FileVersion
+                    {
+                        VersionId = item.VersionId ?? "null",
+                        LastModified = item.LastModifiedDateTime ?? DateTime.MinValue,
+                        Size = (long)item.Size,
+                        IsLatest = item.IsLatest,
+                        ETag = item.ETag ?? string.Empty
+                    });
+                }
+            }
+            
+            // Sort by LastModified descending (newest first)
+            versions = versions.OrderByDescending(v => v.LastModified).ToList();
+            
+            _logger.LogInformation("Found {Count} versions for file {FileName} in bucket {Bucket}", versions.Count, fileName, targetBucket);
+            return versions;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error listing versions for file {FileName}", fileName);
             throw;
         }
     }
@@ -376,18 +468,36 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
         }
     }
 
-    private async Task EnsureBucketExistsAsync()
+    private async Task<string> DetermineBucketForFile(string fileName)
     {
-        var bucketExistsArgs = new BucketExistsArgs()
-            .WithBucket(_bucketName);
-
-        if (!await _minioClient.BucketExistsAsync(bucketExistsArgs))
+        // Check working bucket first
+        try
         {
-            var makeBucketArgs = new MakeBucketArgs()
-                .WithBucket(_bucketName);
+            var workingBucketExistsArgs = new StatObjectArgs()
+                .WithBucket(_workingBucketName)
+                .WithObject(fileName);
+            
+            await _minioClient.StatObjectAsync(workingBucketExistsArgs);
+            return _workingBucketName;
+        }
+        catch
+        {
+            // File not in working bucket, try stable bucket
+            try
+            {
+                var stableBucketExistsArgs = new StatObjectArgs()
+                    .WithBucket(_stableBucketName)
+                    .WithObject(fileName);
                 
-            await _minioClient.MakeBucketAsync(makeBucketArgs);
-            _logger.LogInformation("Bucket {BucketName} created", _bucketName);
+                await _minioClient.StatObjectAsync(stableBucketExistsArgs);
+                return _stableBucketName;
+            }
+            catch
+            {
+                // File not found in either bucket, default to stable
+                return _stableBucketName;
+            }
         }
     }
+
 }

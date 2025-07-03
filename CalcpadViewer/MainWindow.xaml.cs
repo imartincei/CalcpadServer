@@ -50,12 +50,9 @@ public partial class MainWindow : Window
             var secretKey = SecretKeyBox.Password.Trim();
             var useSSL = UseSSLCheckBox.IsChecked == true;
             
-            // Update bucket names based on user input prefix
-            var bucketPrefix = BucketTextBox.Text.Trim();
-            if (bucketPrefix.EndsWith("-storage"))
-                bucketPrefix = bucketPrefix.Substring(0, bucketPrefix.Length - 8);
-            _workingBucketName = $"{bucketPrefix}-storage-working";
-            _stableBucketName = $"{bucketPrefix}-storage-stable";
+            // Use fixed bucket names
+            _workingBucketName = "calcpad-storage-working";
+            _stableBucketName = "calcpad-storage-stable";
 
             if (string.IsNullOrEmpty(endpoint) || string.IsNullOrEmpty(accessKey) || string.IsNullOrEmpty(secretKey))
             {
@@ -90,6 +87,7 @@ public partial class MainWindow : Window
             RefreshButton.IsEnabled = true;
             UploadButton.IsEnabled = true;
             DownloadButton.IsEnabled = true;
+            ViewVersionsButton.IsEnabled = true;
             DeleteButton.IsEnabled = true;
             
             // Initialize user service and try admin login
@@ -845,5 +843,36 @@ public partial class MainWindow : Window
             .WithObject(fileName);
 
         await _minioClient.RemoveObjectAsync(removeObjectArgs);
+    }
+
+    private async void ViewVersionsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (FilesListBox.SelectedItem is not string selectedFileName)
+        {
+            MessageBox.Show("Please select a file to view versions.", "No File Selected", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            StatusText.Text = "Loading file versions...";
+            ViewVersionsButton.IsEnabled = false;
+
+            // Create a window to show versions
+            var versionsWindow = new FileVersionsWindow(selectedFileName, _minioClient, _workingBucketName, _stableBucketName);
+            versionsWindow.Owner = this;
+            versionsWindow.ShowDialog();
+
+            StatusText.Text = "Ready";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to load file versions: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to load versions";
+        }
+        finally
+        {
+            ViewVersionsButton.IsEnabled = true;
+        }
     }
 }
