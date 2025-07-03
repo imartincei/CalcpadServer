@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private User? _selectedUser;
     private User? _currentUser;
     private string _currentCategoryFilter = "All";
+    private PreDefinedTag? _currentTagFilter;
     private List<PreDefinedTag> _tags = new();
     private PreDefinedTag? _selectedTag;
 
@@ -149,6 +150,57 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is TabControl tabControl && tabControl.SelectedItem is TabItem selectedTab)
+        {
+            var tabName = selectedTab.Name;
+            
+            // Only auto-refresh if the tab is enabled and we have necessary connections
+            if (!selectedTab.IsEnabled) return;
+            
+            switch (tabName)
+            {
+                case "AdminTab":
+                    if (_userService != null)
+                        await LoadUsers();
+                    break;
+                case "TagsTab":
+                    if (_userService != null)
+                        await LoadTags();
+                    break;
+                case "FilesTab":
+                    if (_minioClient != null)
+                    {
+                        await LoadFiles();
+                        await LoadTagFilterOptions();
+                    }
+                    break;
+                // Start tab doesn't need refresh
+            }
+        }
+    }
+
+    private void TagFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (TagFilterComboBox.SelectedItem is PreDefinedTag selectedTag)
+        {
+            _currentTagFilter = selectedTag;
+        }
+        else
+        {
+            _currentTagFilter = null;
+        }
+        FilterFilesByCategory();
+    }
+
+    private void ClearTagFilterButton_Click(object sender, RoutedEventArgs e)
+    {
+        TagFilterComboBox.SelectedItem = null;
+        _currentTagFilter = null;
+        FilterFilesByCategory();
+    }
+
     private async Task LoadFiles()
     {
         if (_minioClient == null) return;
@@ -200,18 +252,30 @@ public partial class MainWindow : Window
         FilesListBox.Items.Clear();
         _files.Clear();
 
+        // Start with all files or filter by category
+        IEnumerable<BlobMetadata> filteredFiles;
         if (_currentCategoryFilter == "All")
         {
-            _files.AddRange(_allFiles);
+            filteredFiles = _allFiles;
         }
         else
         {
-            _files.AddRange(_allFiles.Where(f => 
+            filteredFiles = _allFiles.Where(f => 
             {
                 var category = f.Metadata.ContainsKey("file-category") ? f.Metadata["file-category"] : "Unknown";
                 return category.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase);
-            }));
+            });
         }
+
+        // Further filter by tag if a tag filter is selected
+        if (_currentTagFilter != null)
+        {
+            filteredFiles = filteredFiles.Where(f => 
+                f.Tags.Values.Any(tagValue => 
+                    tagValue.Equals(_currentTagFilter.Name, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        _files.AddRange(filteredFiles);
 
         // Add files to display without category brackets
         foreach (var file in _files)
@@ -219,7 +283,28 @@ public partial class MainWindow : Window
             FilesListBox.Items.Add(file.FileName);
         }
 
-        StatusText.Text = $"Showing {_files.Count} files ({_currentCategoryFilter})";
+        var filterText = _currentCategoryFilter;
+        if (_currentTagFilter != null)
+        {
+            filterText += $", Tag: {_currentTagFilter.Name}";
+        }
+        StatusText.Text = $"Showing {_files.Count} files ({filterText})";
+    }
+
+    private async Task LoadTagFilterOptions()
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            var tags = await _userService.GetAllTagsAsync();
+            TagFilterComboBox.ItemsSource = tags;
+        }
+        catch (Exception ex)
+        {
+            // Silently fail if we can't load tags for filtering
+            System.Diagnostics.Debug.WriteLine($"Failed to load tag filter options: {ex.Message}");
+        }
     }
 
     private async Task<BlobMetadata> GetFileMetadata(string fileName, string bucketName)
@@ -986,7 +1071,7 @@ public partial class MainWindow : Window
         if (_selectedTag == null || _userService == null) return;
 
         var result = MessageBox.Show(
-            $"Are you sure you want to delete tag '{_selectedTag.Name}'?", 
+            $"Are you sure you want to delete tag '{_selectedTag.Name}'?\n\nThis will also remove the tag from all files that currently have it.", 
             "Confirm Delete", 
             MessageBoxButton.YesNo, 
             MessageBoxImage.Question);
@@ -1010,6 +1095,9 @@ public partial class MainWindow : Window
             _tags = await _userService.GetAllTagsAsync();
             TagsListBox.ItemsSource = _tags;
             TagsListBox.DisplayMemberPath = "Name";
+            
+            // Also update the tag filter dropdown
+            TagFilterComboBox.ItemsSource = _tags;
             
             StatusText.Text = $"Loaded {_tags.Count} tags";
         }
@@ -1036,7 +1124,6 @@ public partial class MainWindow : Window
             var newTag = await _userService.CreateTagAsync(tagName);
             
             StatusText.Text = $"Tag '{newTag.Name}' created successfully";
-            MessageBox.Show($"Tag '{newTag.Name}' created successfully!", "Tag Created", MessageBoxButton.OK, MessageBoxImage.Information);
             
             await LoadTags();
         }
@@ -1053,20 +1140,32 @@ public partial class MainWindow : Window
 
     private async Task DeleteTag(int tagId)
     {
-        if (_userService == null) return;
+        if (_userService == null || _minioClient == null) return;
 
         try
         {
-            StatusText.Text = "Deleting tag...";
+            StatusText.Text = "Finding files with tag...";
             DeleteTagButton.IsEnabled = false;
 
+            // Get the tag name before deletion for searching files
+            var tagToDelete = _selectedTag;
+            if (tagToDelete == null) return;
+
+            StatusText.Text = "Removing tag from files...";
+            
+            // Find all files that have this tag and remove it
+            await RemoveTagFromAllFiles(tagToDelete.Name);
+
+            StatusText.Text = "Deleting tag...";
+            
+            // Now delete the tag from the database
             var success = await _userService.DeleteTagAsync(tagId);
             
             if (success)
             {
                 StatusText.Text = "Tag deleted successfully";
-                MessageBox.Show("Tag deleted successfully!", "Tag Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
                 await LoadTags();
+                await LoadFiles(); // Refresh files to show updated tags
                 ClearTagDetailsDisplay();
             }
             else
@@ -1083,6 +1182,103 @@ public partial class MainWindow : Window
         finally
         {
             DeleteTagButton.IsEnabled = true;
+        }
+    }
+
+    private async Task RemoveTagFromAllFiles(string tagName)
+    {
+        if (_minioClient == null) return;
+
+        try
+        {
+            var filesWithTag = new List<(string fileName, string bucketName)>();
+
+            // Search in working bucket
+            var workingListObjectsArgs = new ListObjectsArgs()
+                .WithBucket(_workingBucketName)
+                .WithRecursive(true);
+
+            await foreach (var item in _minioClient.ListObjectsEnumAsync(workingListObjectsArgs))
+            {
+                if (await FileHasTag(item.Key, _workingBucketName, tagName))
+                {
+                    filesWithTag.Add((item.Key, _workingBucketName));
+                }
+            }
+
+            // Search in stable bucket
+            var stableListObjectsArgs = new ListObjectsArgs()
+                .WithBucket(_stableBucketName)
+                .WithRecursive(true);
+
+            await foreach (var item in _minioClient.ListObjectsEnumAsync(stableListObjectsArgs))
+            {
+                if (await FileHasTag(item.Key, _stableBucketName, tagName))
+                {
+                    filesWithTag.Add((item.Key, _stableBucketName));
+                }
+            }
+
+            // Remove the tag from all files that have it
+            foreach (var (fileName, bucketName) in filesWithTag)
+            {
+                await RemoveTagFromFile(fileName, bucketName, tagName);
+            }
+
+            if (filesWithTag.Any())
+            {
+                StatusText.Text = $"Removed tag from {filesWithTag.Count} file(s)";
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to remove tag from files: {ex.Message}", ex);
+        }
+    }
+
+    private async Task<bool> FileHasTag(string fileName, string bucketName, string tagName)
+    {
+        try
+        {
+            var tags = await GetFileTags(fileName, bucketName);
+            return tags.Values.Any(tagValue => tagValue.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task RemoveTagFromFile(string fileName, string bucketName, string tagName)
+    {
+        try
+        {
+            var currentTags = await GetFileTags(fileName, bucketName);
+            
+            // Find and remove tags with the specified value
+            var tagsToRemove = currentTags.Where(kvp => kvp.Value.Equals(tagName, StringComparison.OrdinalIgnoreCase)).ToList();
+            
+            if (!tagsToRemove.Any()) return;
+
+            // Remove the tags
+            foreach (var tagToRemove in tagsToRemove)
+            {
+                currentTags.Remove(tagToRemove.Key);
+            }
+
+            // Update the file's tags
+            var tagging = new Tagging(currentTags, true);
+            var setObjectTagsArgs = new SetObjectTagsArgs()
+                .WithBucket(bucketName)
+                .WithObject(fileName)
+                .WithTagging(tagging);
+
+            await _minioClient.SetObjectTagsAsync(setObjectTagsArgs);
+        }
+        catch (Exception ex)
+        {
+            // Log but don't fail the whole operation for one file
+            System.Diagnostics.Debug.WriteLine($"Failed to remove tag from {fileName}: {ex.Message}");
         }
     }
 
