@@ -249,6 +249,9 @@ public partial class MainWindow : Window
 
     private void FilterFilesByCategory()
     {
+        // Debug: Log when this method is called
+        System.Diagnostics.Debug.WriteLine($"FilterFilesByCategory called - Current selection: {FilesListBox.SelectedItem}");
+        
         // Remember the currently selected file to restore after filtering
         var currentlySelectedFile = FilesListBox.SelectedItem as string;
         
