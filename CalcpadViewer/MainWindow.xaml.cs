@@ -255,62 +255,97 @@ public partial class MainWindow : Window
         // Debug: Log when this method is called
         System.Diagnostics.Debug.WriteLine($"FilterFilesByCategory called - Current selection: {FilesListBox.SelectedItem}");
         
-        // Remember the currently selected file to restore after filtering
-        var currentlySelectedFile = FilesListBox.SelectedItem as string;
-        
-        FilesListBox.Items.Clear();
-        _files.Clear();
+        try
+        {
+            // Remember the currently selected file to restore after filtering
+            var currentlySelectedFile = FilesListBox.SelectedItem as string;
+            
+            FilesListBox.Items.Clear();
+            _files.Clear();
 
-        // Start with all files or filter by category
-        IEnumerable<BlobMetadata> filteredFiles;
-        if (_allFiles == null)
-        {
-            filteredFiles = Enumerable.Empty<BlobMetadata>();
-        }
-        else if (_currentCategoryFilter == "All")
-        {
-            filteredFiles = _allFiles;
-        }
-        else
-        {
-            filteredFiles = _allFiles.Where(f => 
+            // Start with all files or filter by category
+            IEnumerable<BlobMetadata> filteredFiles;
+            if (_allFiles == null)
             {
-                if (f?.Metadata == null) return false;
-                var category = f.Metadata.ContainsKey("file-category") ? f.Metadata["file-category"] : "Unknown";
-                return category?.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase) == true;
-            });
-        }
+                System.Diagnostics.Debug.WriteLine("_allFiles is null");
+                filteredFiles = Enumerable.Empty<BlobMetadata>();
+            }
+            else if (_currentCategoryFilter == "All")
+            {
+                System.Diagnostics.Debug.WriteLine("Using all files filter");
+                filteredFiles = _allFiles;
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"Filtering by category: {_currentCategoryFilter}");
+                filteredFiles = _allFiles.Where(f => 
+                {
+                    try
+                    {
+                        if (f?.Metadata == null) return false;
+                        var category = f.Metadata.ContainsKey("file-category") ? f.Metadata["file-category"] : "Unknown";
+                        return category?.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase) == true;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error in category filter: {ex.Message}");
+                        return false;
+                    }
+                });
+            }
 
-        // Further filter by tag if a tag filter is selected
-        if (_currentTagFilter != null && !string.IsNullOrEmpty(_currentTagFilter.Name))
+            // Further filter by tag if a tag filter is selected
+            if (_currentTagFilter != null && !string.IsNullOrEmpty(_currentTagFilter.Name))
+            {
+                System.Diagnostics.Debug.WriteLine($"Filtering by tag: {_currentTagFilter.Name}");
+                filteredFiles = filteredFiles.Where(f => 
+                {
+                    try
+                    {
+                        if (f?.Tags == null) return false;
+                        return f.Tags.Values.Any(tagValue => 
+                            !string.IsNullOrEmpty(tagValue) && 
+                            tagValue.Equals(_currentTagFilter.Name, StringComparison.OrdinalIgnoreCase));
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error in tag filter: {ex.Message}");
+                        return false;
+                    }
+                });
+            }
+
+            System.Diagnostics.Debug.WriteLine("Adding filtered files to _files collection");
+            _files.AddRange(filteredFiles);
+
+            // Add files to display without category brackets
+            foreach (var file in _files)
+            {
+                if (!string.IsNullOrEmpty(file?.FileName))
+                {
+                    FilesListBox.Items.Add(file.FileName);
+                }
+            }
+
+            // Restore the previously selected file if it's still in the filtered list
+            if (!string.IsNullOrEmpty(currentlySelectedFile) && FilesListBox.Items.Contains(currentlySelectedFile))
+            {
+                System.Diagnostics.Debug.WriteLine($"Restoring selection: {currentlySelectedFile}");
+                FilesListBox.SelectedItem = currentlySelectedFile;
+            }
+
+            var filterText = _currentCategoryFilter;
+            if (_currentTagFilter != null)
+            {
+                filterText += $", Tag: {_currentTagFilter.Name}";
+            }
+            StatusText.Text = $"Showing {_files.Count} files ({filterText})";
+        }
+        catch (Exception ex)
         {
-            filteredFiles = filteredFiles.Where(f => 
-                f.Tags != null && f.Tags.Values != null && 
-                f.Tags.Values.Any(tagValue => 
-                    !string.IsNullOrEmpty(tagValue) && 
-                    tagValue.Equals(_currentTagFilter.Name, StringComparison.OrdinalIgnoreCase)));
+            System.Diagnostics.Debug.WriteLine($"Exception in FilterFilesByCategory: {ex}");
+            StatusText.Text = "Error filtering files";
         }
-
-        _files.AddRange(filteredFiles);
-
-        // Add files to display without category brackets
-        foreach (var file in _files)
-        {
-            FilesListBox.Items.Add(file.FileName);
-        }
-
-        // Restore the previously selected file if it's still in the filtered list
-        if (!string.IsNullOrEmpty(currentlySelectedFile) && FilesListBox.Items.Contains(currentlySelectedFile))
-        {
-            FilesListBox.SelectedItem = currentlySelectedFile;
-        }
-
-        var filterText = _currentCategoryFilter;
-        if (_currentTagFilter != null)
-        {
-            filterText += $", Tag: {_currentTagFilter.Name}";
-        }
-        StatusText.Text = $"Showing {_files.Count} files ({filterText})";
     }
 
     private async Task LoadTagFilterOptions()
