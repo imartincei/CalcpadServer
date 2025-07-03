@@ -67,6 +67,33 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
     
+    // Multi-tag selection for filtering
+    public ObservableCollection<PreDefinedTag> SelectedTagFilters { get; } = new();
+    
+    private bool _isMultiTagFilterEnabled = false;
+    public bool IsMultiTagFilterEnabled
+    {
+        get => _isMultiTagFilterEnabled;
+        set
+        {
+            if (_isMultiTagFilterEnabled != value)
+            {
+                _isMultiTagFilterEnabled = value;
+                OnPropertyChanged();
+                // Clear single selection when switching to multi-select
+                if (value)
+                {
+                    CurrentTagFilter = null;
+                }
+                else
+                {
+                    SelectedTagFilters.Clear();
+                }
+                FilterFilesByTag();
+            }
+        }
+    }
+    
     private string _currentCategoryFilter = "All";
     public string CurrentCategoryFilter
     {
@@ -141,6 +168,9 @@ public class MainViewModel : INotifyPropertyChanged
     public MainViewModel(IUserService? userService = null)
     {
         _userService = userService;
+        
+        // Subscribe to collection changes for multi-tag filtering
+        SelectedTagFilters.CollectionChanged += (s, e) => FilterFilesByTag();
     }
     
     public void SetUserService(IUserService userService)
@@ -232,26 +262,62 @@ public class MainViewModel : INotifyPropertyChanged
     
     private void FilterFilesByTag()
     {
-        if (CurrentTagFilter == null)
+        Files.Clear();
+        
+        if (IsMultiTagFilterEnabled)
         {
-            // Show all files
-            Files.Clear();
-            foreach (var file in AllFiles)
+            // Multi-tag filtering
+            if (SelectedTagFilters.Count == 0)
             {
-                Files.Add(file);
+                // No tags selected, show all files
+                foreach (var file in AllFiles)
+                {
+                    Files.Add(file);
+                }
+            }
+            else
+            {
+                // Show files that have ANY of the selected tags
+                foreach (var file in AllFiles)
+                {
+                    if (file?.Tags != null && SelectedTagFilters.Any(selectedTag =>
+                        file.Tags.Values.Any(tagValue =>
+                            !string.IsNullOrEmpty(tagValue) &&
+                            tagValue.Equals(selectedTag.Name, StringComparison.OrdinalIgnoreCase))))
+                    {
+                        Files.Add(file);
+                    }
+                }
             }
         }
         else
         {
-            // Filter by tag
-            Files.Clear();
-            foreach (var file in AllFiles)
+            // Single tag filtering (original logic)
+            if (CurrentTagFilter == null)
             {
-                // Add your tag filtering logic here
-                // This is a placeholder - you'll need to implement based on your tag structure
-                Files.Add(file);
+                // Show all files
+                foreach (var file in AllFiles)
+                {
+                    Files.Add(file);
+                }
+            }
+            else
+            {
+                // Filter by single tag
+                foreach (var file in AllFiles)
+                {
+                    if (file?.Tags != null && file.Tags.Values.Any(tagValue =>
+                        !string.IsNullOrEmpty(tagValue) &&
+                        tagValue.Equals(CurrentTagFilter.Name, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        Files.Add(file);
+                    }
+                }
             }
         }
+        
+        // Also apply category filter
+        FilterFilesByCategory();
     }
     
     private void FilterFilesByCategory()

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using Minio;
 using Minio.DataModel.Args;
 using Minio.DataModel.Tags;
@@ -270,7 +271,54 @@ public partial class MainWindow : Window
     {
         TagFilterComboBox.SelectedItem = null;
         _viewModel.CurrentTagFilter = null;
+        _viewModel.SelectedTagFilters.Clear();
+        
+        // Clear all checkboxes in multi-tag mode
+        foreach (CheckBox checkBox in FindVisualChildren<CheckBox>(MultiTagFilterListBox))
+        {
+            checkBox.IsChecked = false;
+        }
+        
         FilterFilesByCategory();
+    }
+    
+    private void MultiTagCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (sender is CheckBox checkBox && checkBox.Tag is PreDefinedTag tag)
+        {
+            if (checkBox.IsChecked == true)
+            {
+                if (!_viewModel.SelectedTagFilters.Contains(tag))
+                {
+                    _viewModel.SelectedTagFilters.Add(tag);
+                }
+            }
+            else
+            {
+                _viewModel.SelectedTagFilters.Remove(tag);
+            }
+        }
+    }
+    
+    // Helper method to find visual children
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject depObj) where T : DependencyObject
+    {
+        if (depObj != null)
+        {
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(depObj, i);
+                if (child != null && child is T)
+                {
+                    yield return (T)child;
+                }
+
+                foreach (T childOfChild in FindVisualChildren<T>(child))
+                {
+                    yield return childOfChild;
+                }
+            }
+        }
     }
 
     private async Task LoadFiles()

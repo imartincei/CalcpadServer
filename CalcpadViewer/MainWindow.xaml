@@ -89,18 +89,59 @@
                             
                             <!-- Tag Filter -->
                             <GroupBox Header="Filter by Tag" Grid.Row="1" Margin="5,0,5,5">
-                                <StackPanel Orientation="Horizontal">
+                                <StackPanel>
+                                    <!-- Filter Mode Toggle -->
+                                    <StackPanel Orientation="Horizontal" Margin="5">
+                                        <CheckBox x:Name="MultiTagFilterCheckBox" Content="Multi-Tag Selection" 
+                                                  IsChecked="{Binding IsMultiTagFilterEnabled}" Margin="0,0,10,0"/>
+                                        <Button x:Name="ClearTagFilterButton" Content="Clear Filter" 
+                                                Padding="5,2" Click="ClearTagFilterButton_Click"/>
+                                    </StackPanel>
+                                    
+                                    <!-- Single Tag Selection (ComboBox) -->
                                     <ComboBox x:Name="TagFilterComboBox" Width="200" Margin="5"
                                               ItemsSource="{Binding Tags}"
                                               SelectedItem="{Binding CurrentTagFilter}">
+                                        <ComboBox.Style>
+                                            <Style TargetType="ComboBox">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMultiTagFilterEnabled}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ComboBox.Style>
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Text="{Binding Name}"/>
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
-                                    <Button x:Name="ClearTagFilterButton" Content="Clear Filter" 
-                                            Margin="5" Padding="5" Click="ClearTagFilterButton_Click"/>
+                                    
+                                    <!-- Multi Tag Selection (ListBox with CheckBoxes) -->
+                                    <ListBox x:Name="MultiTagFilterListBox" MaxHeight="120" Margin="5"
+                                             ItemsSource="{Binding Tags}"
+                                             SelectionMode="Multiple">
+                                        <ListBox.Style>
+                                            <Style TargetType="ListBox">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMultiTagFilterEnabled}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ListBox.Style>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <CheckBox Content="{Binding Name}" 
+                                                          Tag="{Binding}"
+                                                          Checked="MultiTagCheckBox_Changed"
+                                                          Unchecked="MultiTagCheckBox_Changed"/>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
                                 </StackPanel>
                             </GroupBox>
                             
