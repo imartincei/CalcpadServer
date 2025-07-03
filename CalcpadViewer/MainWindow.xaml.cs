@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private IUserService? _userService;
     private User? _currentUser;
     private MainViewModel _viewModel;
+    private string? _lastSelectedTab;
     
 
     public MainWindow()
@@ -195,20 +196,39 @@ public partial class MainWindow : Window
 
     private async void MainTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        System.Diagnostics.Debug.WriteLine("MainTabControl_SelectionChanged called");
+        
         if (sender is TabControl tabControl && tabControl.SelectedItem is TabItem selectedTab)
         {
             var tabName = selectedTab.Name;
+            System.Diagnostics.Debug.WriteLine($"Tab selected: {tabName}");
+            
+            // Only load data if this is a new tab selection
+            if (_lastSelectedTab == tabName)
+            {
+                System.Diagnostics.Debug.WriteLine($"Tab {tabName} is already selected, skipping load");
+                return;
+            }
+            
+            _lastSelectedTab = tabName;
+            System.Diagnostics.Debug.WriteLine($"Tab changed from {_lastSelectedTab} to {tabName}");
             
             // Only auto-refresh if the tab is enabled and we have necessary connections
-            if (!selectedTab.IsEnabled) return;
+            if (!selectedTab.IsEnabled) 
+            {
+                System.Diagnostics.Debug.WriteLine("Tab is disabled, returning");
+                return;
+            }
             
             switch (tabName)
             {
                 case "AdminTab":
+                    System.Diagnostics.Debug.WriteLine("AdminTab case - calling LoadUsersAsync");
                     if (_userService != null)
                         await _viewModel.LoadUsersAsync();
                     break;
                 case "TagsTab":
+                    System.Diagnostics.Debug.WriteLine("TagsTab case - calling LoadTagsAsync");
                     if (_userService != null)
                         await _viewModel.LoadTagsAsync();
                     break;
