@@ -842,6 +842,9 @@ public partial class MainWindow : Window
             var currentSelectedUserId = _selectedUser?.Id;
             
             _users = await _userService.GetAllUsersAsync();
+            
+            // Temporarily disable selection changed event to prevent loops
+            UsersDataGrid.SelectionChanged -= UsersDataGrid_SelectionChanged;
             UsersDataGrid.ItemsSource = _users;
             
             // Restore the previously selected user if it still exists
@@ -858,6 +861,9 @@ public partial class MainWindow : Window
                     _selectedUser = null;
                 }
             }
+            
+            // Re-enable selection changed event
+            UsersDataGrid.SelectionChanged += UsersDataGrid_SelectionChanged;
             
             StatusText.Text = $"Loaded {_users.Count} users";
         }
@@ -1273,6 +1279,9 @@ public partial class MainWindow : Window
             var currentSelectedTagId = _selectedTag?.Id;
             
             _tags = await _userService.GetAllTagsAsync();
+            
+            // Temporarily disable selection changed events to prevent loops
+            TagsListBox.SelectionChanged -= TagsListBox_SelectionChanged;
             TagsListBox.ItemsSource = _tags;
             TagsListBox.DisplayMemberPath = "Name";
             
@@ -1290,6 +1299,9 @@ public partial class MainWindow : Window
                     _selectedTag = null;
                 }
             }
+            
+            // Re-enable TagsListBox selection changed event
+            TagsListBox.SelectionChanged += TagsListBox_SelectionChanged;
             
             // Also update the tag filter dropdown with selection persistence
             TagFilterComboBox.SelectionChanged -= TagFilterComboBox_SelectionChanged;
