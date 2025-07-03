@@ -263,7 +263,11 @@ public partial class MainWindow : Window
 
         // Start with all files or filter by category
         IEnumerable<BlobMetadata> filteredFiles;
-        if (_currentCategoryFilter == "All")
+        if (_allFiles == null)
+        {
+            filteredFiles = Enumerable.Empty<BlobMetadata>();
+        }
+        else if (_currentCategoryFilter == "All")
         {
             filteredFiles = _allFiles;
         }
@@ -271,16 +275,19 @@ public partial class MainWindow : Window
         {
             filteredFiles = _allFiles.Where(f => 
             {
+                if (f?.Metadata == null) return false;
                 var category = f.Metadata.ContainsKey("file-category") ? f.Metadata["file-category"] : "Unknown";
-                return category.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase);
+                return category?.Equals(_currentCategoryFilter, StringComparison.OrdinalIgnoreCase) == true;
             });
         }
 
         // Further filter by tag if a tag filter is selected
-        if (_currentTagFilter != null)
+        if (_currentTagFilter != null && !string.IsNullOrEmpty(_currentTagFilter.Name))
         {
             filteredFiles = filteredFiles.Where(f => 
+                f.Tags != null && f.Tags.Values != null && 
                 f.Tags.Values.Any(tagValue => 
+                    !string.IsNullOrEmpty(tagValue) && 
                     tagValue.Equals(_currentTagFilter.Name, StringComparison.OrdinalIgnoreCase)));
         }
 
