@@ -249,6 +249,9 @@ public partial class MainWindow : Window
 
     private void FilterFilesByCategory()
     {
+        // Remember the currently selected file to restore after filtering
+        var currentlySelectedFile = FilesListBox.SelectedItem as string;
+        
         FilesListBox.Items.Clear();
         _files.Clear();
 
@@ -281,6 +284,12 @@ public partial class MainWindow : Window
         foreach (var file in _files)
         {
             FilesListBox.Items.Add(file.FileName);
+        }
+
+        // Restore the previously selected file if it's still in the filtered list
+        if (!string.IsNullOrEmpty(currentlySelectedFile) && FilesListBox.Items.Contains(currentlySelectedFile))
+        {
+            FilesListBox.SelectedItem = currentlySelectedFile;
         }
 
         var filterText = _currentCategoryFilter;
