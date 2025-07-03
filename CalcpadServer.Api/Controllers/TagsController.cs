@@ -45,7 +45,12 @@ public class TagsController : ControllerBase
                 return BadRequest("Tag name is required");
             }
 
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            var userContext = HttpContext.Items["UserContext"] as UserContext;
+            if (userContext == null)
+            {
+                return Unauthorized("User authentication required");
+            }
+            
             var tag = await _tagsService.CreateTagAsync(request.Name, userContext);
             
             return CreatedAtAction(nameof(GetAllTags), new { id = tag.Id }, tag);
@@ -67,7 +72,12 @@ public class TagsController : ControllerBase
     {
         try
         {
-            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            var userContext = HttpContext.Items["UserContext"] as UserContext;
+            if (userContext == null)
+            {
+                return Unauthorized("User authentication required");
+            }
+            
             var success = await _tagsService.DeleteTagAsync(id, userContext);
             
             if (!success)
