@@ -170,11 +170,13 @@ public partial class MainWindow : Window
                         await LoadTags();
                     break;
                 case "FilesTab":
-                    if (_minioClient != null)
-                    {
-                        await LoadFiles();
-                        await LoadTagFilterOptions();
-                    }
+                    // Temporarily disabled auto-refresh to debug selection issue
+                    // if (_minioClient != null)
+                    // {
+                    //     await LoadFiles();
+                    //     await LoadTagFilterOptions();
+                    // }
+                    System.Diagnostics.Debug.WriteLine("FilesTab selected - auto-refresh disabled for debugging");
                     break;
                 // Start tab doesn't need refresh
             }
@@ -210,6 +212,10 @@ public partial class MainWindow : Window
 
         try
         {
+            // Debug: Log when LoadFiles is called
+            System.Diagnostics.Debug.WriteLine("LoadFiles called");
+            System.Diagnostics.Debug.WriteLine($"LoadFiles call stack: {Environment.StackTrace}");
+            
             StatusText.Text = "Loading files...";
             RefreshButton.IsEnabled = false;
             _allFiles.Clear();
