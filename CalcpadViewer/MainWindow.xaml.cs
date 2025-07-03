@@ -252,8 +252,9 @@ public partial class MainWindow : Window
 
     private void FilterFilesByCategory()
     {
-        // Debug: Log when this method is called
+        // Debug: Log when this method is called with stack trace
         System.Diagnostics.Debug.WriteLine($"FilterFilesByCategory called - Current selection: {FilesListBox.SelectedItem}");
+        System.Diagnostics.Debug.WriteLine($"Call stack: {Environment.StackTrace}");
         
         try
         {
@@ -328,10 +329,35 @@ public partial class MainWindow : Window
             }
 
             // Restore the previously selected file if it's still in the filtered list
-            if (!string.IsNullOrEmpty(currentlySelectedFile) && FilesListBox.Items.Contains(currentlySelectedFile))
+            if (!string.IsNullOrEmpty(currentlySelectedFile))
             {
-                System.Diagnostics.Debug.WriteLine($"Restoring selection: {currentlySelectedFile}");
-                FilesListBox.SelectedItem = currentlySelectedFile;
+                try
+                {
+                    // Check if the file is still in the list by iterating instead of using Contains
+                    bool fileFound = false;
+                    foreach (var item in FilesListBox.Items)
+                    {
+                        if (item != null && item.ToString() == currentlySelectedFile)
+                        {
+                            fileFound = true;
+                            break;
+                        }
+                    }
+                    
+                    if (fileFound)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Restoring selection: {currentlySelectedFile}");
+                        FilesListBox.SelectedItem = currentlySelectedFile;
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"File not found in filtered list: {currentlySelectedFile}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error restoring selection: {ex.Message}");
+                }
             }
 
             var filterText = _currentCategoryFilter;
