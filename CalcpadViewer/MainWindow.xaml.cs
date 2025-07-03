@@ -17,11 +17,11 @@ public partial class MainWindow : Window
     private IMinioClient? _minioClient;
     private string _workingBucketName = "calcpad-storage-working";
     private string _stableBucketName = "calcpad-storage-stable";
-    private IUserService? _userService;
+    private UserService? _userService;
     private User? _currentUser;
-    private MainViewModel _viewModel;
+    private readonly MainViewModel _viewModel;
     private string? _lastSelectedTab;
-    
+
 
     public MainWindow()
     {
@@ -255,10 +255,7 @@ public partial class MainWindow : Window
     {
         // Clear the multi-select ComboBox
         var listBox = (ListBox)MultiTagFilterComboBox.Template.FindName("lstBox", MultiTagFilterComboBox);
-        if (listBox != null)
-        {
-            listBox.SelectedItems.Clear();
-        }
+        listBox?.SelectedItems.Clear();
         
         _viewModel.SelectedTagFilters.Clear();
         FilterFilesByCategory();
@@ -347,7 +344,7 @@ public partial class MainWindow : Window
             if (_viewModel.AllFiles == null)
             {
                 System.Diagnostics.Debug.WriteLine("_viewModel.AllFiles is null");
-                filteredFiles = Enumerable.Empty<BlobMetadata>();
+                filteredFiles = [];
             }
             else if (_viewModel.CurrentCategoryFilter == "All")
             {
@@ -362,7 +359,7 @@ public partial class MainWindow : Window
                     try
                     {
                         if (f?.Metadata == null) return false;
-                        var category = f.Metadata.ContainsKey("file-category") ? f.Metadata["file-category"] : "Unknown";
+                        var category = f.Metadata.TryGetValue("file-category", out string? value) ? value : "Unknown";
                         return category?.Equals(_viewModel.CurrentCategoryFilter, StringComparison.OrdinalIgnoreCase) == true;
                     }
                     catch (Exception ex)
@@ -470,7 +467,7 @@ public partial class MainWindow : Window
                 Metadata = Metadata
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             // Return basic metadata if detailed fetch fails
             return new BlobMetadata 
@@ -482,7 +479,7 @@ public partial class MainWindow : Window
 
     private async Task<Dictionary<string, string>> GetFileTags(string fileName, string bucketName)
     {
-        if (_minioClient == null) return new Dictionary<string, string>();
+        if (_minioClient == null) return [];
 
         try
         {
@@ -496,7 +493,7 @@ public partial class MainWindow : Window
         }
         catch
         {
-            return new Dictionary<string, string>();
+            return [];
         }
     }
 
@@ -522,8 +519,8 @@ public partial class MainWindow : Window
         var fileMetadata = _viewModel.Files.FirstOrDefault(f => f.FileName == fileName);
         if (fileMetadata != null)
         {
-            var category = fileMetadata.Metadata.ContainsKey("file-category") ? fileMetadata.Metadata["file-category"] : "Unknown";
-            var bucketName = category.ToLower() == "working" ? _workingBucketName : _stableBucketName;
+            var category = fileMetadata.Metadata.TryGetValue("file-category", out string? value) ? value : "Unknown";
+            var bucketName = category.Equals("working", StringComparison.CurrentCultureIgnoreCase) ? _workingBucketName : _stableBucketName;
             return (fileName, bucketName);
         }
         
@@ -562,7 +559,7 @@ public partial class MainWindow : Window
         {
             MetadataItems.ItemsSource = new List<KeyValueDisplay> 
             { 
-                new KeyValueDisplay { Key = "Status", Value = "No metadata found" } 
+                new() { Key = "Status", Value = "No metadata found" } 
             };
         }
 
@@ -577,7 +574,7 @@ public partial class MainWindow : Window
         {
             TagsItems.ItemsSource = new List<KeyValueDisplay> 
             { 
-                new KeyValueDisplay { Key = "Status", Value = "No tags found" } 
+                new() { Key = "Status", Value = "No tags found" } 
             };
         }
     }
@@ -594,11 +591,11 @@ public partial class MainWindow : Window
         TagsItems.ItemsSource = null;
     }
 
-    private string FormatFileSize(long bytes)
+    private static string FormatFileSize(long bytes)
     {
         if (bytes == 0) return "0 B";
         
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
         var order = 0;
         var size = (double)bytes;
         
@@ -619,8 +616,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var uploadDialog = new UploadDialog(_userService);
-        uploadDialog.Owner = this;
+        var uploadDialog = new UploadDialog(_userService)
+        {
+            Owner = this
+        };
 
         if (uploadDialog.ShowDialog() == true)
         {
@@ -670,7 +669,7 @@ public partial class MainWindow : Window
             if (metadata.DateTested.HasValue)
                 headers["date-tested"] = metadata.DateTested.Value.ToString("O");
 
-            if (headers.Any())
+            if (headers.Count != 0)
             {
                 putObjectArgs.WithHeaders(headers);
             }
@@ -678,7 +677,7 @@ public partial class MainWindow : Window
             await _minioClient.PutObjectAsync(putObjectArgs);
 
             // Set tags if provided
-            if (tags.Any())
+            if (tags.Count != 0)
             {
                 try
                 {
@@ -716,7 +715,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private string GetContentType(string fileName)
+    private static string GetContentType(string fileName)
     {
         var extension = Path.GetExtension(fileName).ToLowerInvariant();
         return extension switch
@@ -747,8 +746,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var addUserDialog = new AddUserDialog();
-        addUserDialog.Owner = this;
+        var addUserDialog = new AddUserDialog
+        {
+            Owner = this
+        };
 
         if (addUserDialog.ShowDialog() == true && addUserDialog.UserRequest != null)
         {
@@ -761,8 +762,7 @@ public partial class MainWindow : Window
     {
         if (_viewModel.SelectedUser == null || _userService == null) return;
 
-        var selectedRoleItem = UserRoleComboBox.SelectedItem as ComboBoxItem;
-        if (selectedRoleItem == null) return;
+        if (UserRoleComboBox.SelectedItem is not ComboBoxItem selectedRoleItem) return;
 
         var updateRequest = new UpdateUserRequest
         {
@@ -967,6 +967,8 @@ public partial class MainWindow : Window
                 stream.CopyTo(fileStream);
             });
 
+        if (_minioClient == null)
+            throw new InvalidOperationException("MinIO client is not initialized.");
         await _minioClient.GetObjectAsync(getObjectArgs);
     }
 
@@ -1028,6 +1030,9 @@ public partial class MainWindow : Window
                 .WithPrefix(fileName)
                 .WithVersions(true);
 
+            if (_minioClient == null)
+                throw new InvalidOperationException("MinIO client is not initialized.");
+
             await foreach (var item in _minioClient.ListObjectsEnumAsync(listObjectsArgs))
             {
                 if (item.Key == fileName) // Exact match only
@@ -1069,10 +1074,14 @@ public partial class MainWindow : Window
         {
             _viewModel.StatusText = "Loading file versions...";
             ViewVersionsButton.IsEnabled = false;
+            if (_minioClient == null)
+                throw new InvalidOperationException("MinIO client is not initialized.");
 
             // Create a window to show versions
-            var versionsWindow = new FileVersionsWindow(selectedFileName, _minioClient, _workingBucketName, _stableBucketName);
-            versionsWindow.Owner = this;
+            var versionsWindow = new FileVersionsWindow(selectedFileName, _minioClient, _workingBucketName, _stableBucketName)
+            {
+                Owner = this
+            };
             versionsWindow.ShowDialog();
 
             _viewModel.StatusText = "Ready";
@@ -1272,12 +1281,13 @@ public partial class MainWindow : Window
             }
 
             // Remove the tag from all files that have it
+
             foreach (var (fileName, bucketName) in filesWithTag)
             {
-                await RemoveTagFromFile(fileName, bucketName, tagName);
+                await RemoveTagFromFile(fileName, bucketName, tagName, _minioClient);
             }
 
-            if (filesWithTag.Any())
+            if (filesWithTag.Count != 0)
             {
                 _viewModel.StatusText = $"Removed tag from {filesWithTag.Count} file(s)";
             }
@@ -1301,7 +1311,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task RemoveTagFromFile(string fileName, string bucketName, string tagName)
+    private async Task RemoveTagFromFile(string fileName, string bucketName, string tagName, IMinioClient _minioClient)
     {
         try
         {
@@ -1310,7 +1320,7 @@ public partial class MainWindow : Window
             // Find and remove tags with the specified value
             var tagsToRemove = currentTags.Where(kvp => kvp.Value.Equals(tagName, StringComparison.OrdinalIgnoreCase)).ToList();
             
-            if (!tagsToRemove.Any()) return;
+            if (tagsToRemove.Count == 0) return;
 
             // Remove the tags
             foreach (var tagToRemove in tagsToRemove)

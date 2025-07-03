@@ -13,7 +13,7 @@ public partial class FileVersionsWindow : Window
     private readonly IMinioClient _minioClient;
     private readonly string _workingBucketName;
     private readonly string _stableBucketName;
-    private List<FileVersionDisplay> _versions = new();
+    private List<FileVersionDisplay> _versions = [];
     private FileVersionDisplay? _selectedVersion;
 
     public FileVersionsWindow(string fileName, IMinioClient minioClient, string workingBucketName, string stableBucketName)
@@ -63,11 +63,11 @@ public partial class FileVersionsWindow : Window
             }
             
             // Sort by LastModified descending (newest first)
-            _versions = _versions.OrderByDescending(v => v.LastModified).ToList();
+            _versions = [.. _versions.OrderByDescending(v => v.LastModified)];
             
             VersionsDataGrid.ItemsSource = _versions;
             
-            if (!_versions.Any())
+            if (_versions.Count == 0)
             {
                 MessageBox.Show("No versions found for this file.", "No Versions", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -170,7 +170,7 @@ public class FileVersionDisplay : FileVersion
     {
         if (bytes == 0) return "0 B";
         
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        string[] sizes = ["B", "KB", "MB", "GB", "TB"];
         var order = 0;
         var size = (double)bytes;
         

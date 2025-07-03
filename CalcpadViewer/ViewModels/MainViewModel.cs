@@ -11,10 +11,10 @@ public class MainViewModel : INotifyPropertyChanged
     private IUserService? _userService;
     
     // Observable collections for data binding
-    public ObservableCollection<User> Users { get; } = new();
-    public ObservableCollection<PreDefinedTag> Tags { get; } = new();
-    public ObservableCollection<BlobMetadata> Files { get; } = new();
-    public ObservableCollection<BlobMetadata> AllFiles { get; } = new();
+    public ObservableCollection<User> Users { get; } = [];
+    public ObservableCollection<PreDefinedTag> Tags { get; } = [];
+    public ObservableCollection<BlobMetadata> Files { get; } = [];
+    public ObservableCollection<BlobMetadata> AllFiles { get; } = [];
     
     // Selected items
     private User? _selectedUser;
@@ -52,7 +52,7 @@ public class MainViewModel : INotifyPropertyChanged
     public Action<PreDefinedTag?>? OnTagSelectionChanged { get; set; }
     
     // Multi-tag selection for filtering (now the primary method)
-    public ObservableCollection<PreDefinedTag> SelectedTagFilters { get; } = new();
+    public ObservableCollection<PreDefinedTag> SelectedTagFilters { get; } = [];
     
     private string _currentCategoryFilter = "All";
     public string CurrentCategoryFilter
@@ -162,6 +162,11 @@ public class MainViewModel : INotifyPropertyChanged
             
             // Clear and repopulate the collection
             Users.Clear();
+            if (users == null || users.Count == 0)
+            {
+                StatusText = "No users found";
+                return;
+            }
             foreach (var user in users)
             {
                 Users.Add(user);
@@ -203,8 +208,14 @@ public class MainViewModel : INotifyPropertyChanged
             
             // Clear and repopulate the collection
             Tags.Clear();
-            foreach (var tag in tags)
+            if (tags == null || tags.Count == 0)
             {
+                StatusText = "No tags found";
+                return;
+            }
+            for (int i = 0; i < tags.Count; i++)
+            {
+                PreDefinedTag? tag = tags[i];
                 Tags.Add(tag);
             }
             
