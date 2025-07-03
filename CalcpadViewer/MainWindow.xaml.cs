@@ -26,9 +26,38 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
+        
+        // Subscribe to ViewModel events
+        _viewModel.OnTagSelectionChanged = OnTagSelectionChanged;
+        _viewModel.OnUserSelectionChanged = OnUserSelectionChanged;
+        
         SecretKeyBox.Password = "calcpad-password-123"; // Default password
         AdminPasswordBox.Password = "admin123"; // Default admin password
         InitializeUserRoleComboBox();
+    }
+    
+    private void OnTagSelectionChanged(PreDefinedTag? selectedTag)
+    {
+        if (selectedTag != null)
+        {
+            DisplayTagDetails(selectedTag);
+        }
+        else
+        {
+            ClearTagDetailsDisplay();
+        }
+    }
+    
+    private void OnUserSelectionChanged(User? selectedUser)
+    {
+        if (selectedUser != null)
+        {
+            DisplayUserDetails(selectedUser);
+        }
+        else
+        {
+            ClearUserDetailsDisplay();
+        }
     }
 
     private void InitializeUserRoleComboBox()
@@ -780,19 +809,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UsersDataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (UsersDataGrid.SelectedItem is User selectedUser)
-        {
-            _viewModel.SelectedUser = selectedUser;
-            DisplayUserDetails(selectedUser);
-        }
-        else
-        {
-            _viewModel.SelectedUser = null;
-            ClearUserDetailsDisplay();
-        }
-    }
 
     private async void UpdateUserButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1182,19 +1198,6 @@ public partial class MainWindow : Window
         NewTagTextBox.Focus();
     }
 
-    private void TagsListBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-    {
-        if (TagsListBox.SelectedItem is PreDefinedTag selectedTag)
-        {
-            _viewModel.SelectedTag = selectedTag;
-            DisplayTagDetails(selectedTag);
-        }
-        else
-        {
-            _viewModel.SelectedTag = null;
-            ClearTagDetailsDisplay();
-        }
-    }
 
     private async void DeleteTagButton_Click(object sender, RoutedEventArgs e)
     {

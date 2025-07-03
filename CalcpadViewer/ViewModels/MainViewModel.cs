@@ -27,9 +27,12 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 _selectedUser = value;
                 OnPropertyChanged();
+                OnUserSelectionChanged?.Invoke(_selectedUser);
             }
         }
     }
+    
+    public Action<User?>? OnUserSelectionChanged { get; set; }
     
     private PreDefinedTag? _selectedTag;
     public PreDefinedTag? SelectedTag
@@ -41,9 +44,12 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 _selectedTag = value;
                 OnPropertyChanged();
+                OnTagSelectionChanged?.Invoke(_selectedTag);
             }
         }
     }
+    
+    public Action<PreDefinedTag?>? OnTagSelectionChanged { get; set; }
     
     private PreDefinedTag? _currentTagFilter;
     public PreDefinedTag? CurrentTagFilter
