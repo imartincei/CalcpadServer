@@ -188,7 +188,7 @@ public partial class MainWindow : Window
                     {
                         await LoadTagFilterOptions();
                         // Only reload files if the list is empty (first time switching to tab)
-                        if (_allFiles.Count == 0)
+                        if (_viewModel.AllFiles.Count == 0)
                         {
                             System.Diagnostics.Debug.WriteLine("Loading files for first time");
                             await LoadFiles();
@@ -207,11 +207,11 @@ public partial class MainWindow : Window
         
         if (TagFilterComboBox.SelectedItem is PreDefinedTag selectedTag)
         {
-            _currentTagFilter = selectedTag;
+            _viewModel.CurrentTagFilter = selectedTag;
         }
         else
         {
-            _currentTagFilter = null;
+            _viewModel.CurrentTagFilter = null;
         }
         FilterFilesByCategory();
     }
@@ -319,9 +319,9 @@ public partial class MainWindow : Window
             }
 
             // Further filter by tag if a tag filter is selected
-            if (_currentTagFilter != null && !string.IsNullOrEmpty(_currentTagFilter.Name))
+            if (_viewModel.CurrentTagFilter != null && !string.IsNullOrEmpty(_viewModel.CurrentTagFilter.Name))
             {
-                System.Diagnostics.Debug.WriteLine($"Filtering by tag: {_currentTagFilter.Name}");
+                System.Diagnostics.Debug.WriteLine($"Filtering by tag: {_viewModel.CurrentTagFilter.Name}");
                 filteredFiles = filteredFiles.Where(f => 
                 {
                     try
@@ -329,7 +329,7 @@ public partial class MainWindow : Window
                         if (f?.Tags == null) return false;
                         return f.Tags.Values.Any(tagValue => 
                             !string.IsNullOrEmpty(tagValue) && 
-                            tagValue.Equals(_currentTagFilter.Name, StringComparison.OrdinalIgnoreCase));
+                            tagValue.Equals(_viewModel.CurrentTagFilter.Name, StringComparison.OrdinalIgnoreCase));
                     }
                     catch (Exception ex)
                     {
@@ -383,10 +383,10 @@ public partial class MainWindow : Window
                 }
             }
 
-            var filterText = _currentCategoryFilter;
-            if (_currentTagFilter != null)
+            var filterText = _viewModel.CurrentCategoryFilter;
+            if (_viewModel.CurrentTagFilter != null)
             {
-                filterText += $", Tag: {_currentTagFilter.Name}";
+                filterText += $", Tag: {_viewModel.CurrentTagFilter.Name}";
             }
             _viewModel.StatusText = $"Showing {_viewModel.Files.Count} files ({filterText})";
         }
