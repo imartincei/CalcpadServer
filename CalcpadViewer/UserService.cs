@@ -151,7 +151,6 @@ public class UserService : IUserService
     {
         try
         {
-            AddAuthHeader();
             var response = await _httpClient.GetAsync($"{_baseUrl}/api/tags");
             response.EnsureSuccessStatusCode();
             
@@ -168,7 +167,6 @@ public class UserService : IUserService
     {
         try
         {
-            AddAuthHeader();
             var request = new { Name = tagName };
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -189,7 +187,6 @@ public class UserService : IUserService
     {
         try
         {
-            AddAuthHeader();
             var response = await _httpClient.DeleteAsync($"{_baseUrl}/api/tags/{tagId}");
             return response.IsSuccessStatusCode;
         }

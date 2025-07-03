@@ -1,6 +1,7 @@
 ## Recent Work
 - Working on tag debugging on the last restart
 - Don't try to build CalcpadViewer, I will build it to test
+- CalcpadViewer cannot run on Linux. Do not try to compile it
 
 ## MinIO Metadata
 - Default metadata in MinIO includes properties like:
