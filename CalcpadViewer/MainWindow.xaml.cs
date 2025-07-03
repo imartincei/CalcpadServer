@@ -475,13 +475,16 @@ public partial class MainWindow : Window
 
         // All Metadata - Combined structured and custom metadata
         var allMetadataItems = new List<KeyValueDisplay>();
-        foreach (var kvp in metadata.Metadata)
+        if (metadata.Metadata != null)
         {
-            allMetadataItems.Add(new KeyValueDisplay { Key = kvp.Key, Value = kvp.Value });
+            foreach (var kvp in metadata.Metadata)
+            {
+                allMetadataItems.Add(new KeyValueDisplay { Key = kvp.Key, Value = kvp.Value });
+            }
         }
 
         MetadataGroup.Visibility = Visibility.Visible;
-        if (allMetadataItems.Any())
+        if (allMetadataItems.Count > 0)
         {
             MetadataItems.ItemsSource = allMetadataItems;
         }
@@ -495,7 +498,7 @@ public partial class MainWindow : Window
 
         // Tags - Always show section, display "None" if empty
         TagsGroup.Visibility = Visibility.Visible;
-        if (metadata.Tags.Any())
+        if (metadata.Tags != null && metadata.Tags.Count > 0)
         {
             var tagItems = metadata.Tags.Select(kvp => new KeyValueDisplay { Key = kvp.Key, Value = kvp.Value }).ToList();
             TagsItems.ItemsSource = tagItems;
