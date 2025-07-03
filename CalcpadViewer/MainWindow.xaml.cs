@@ -6,6 +6,7 @@ using Minio.DataModel.Args;
 using Minio.DataModel.Tags;
 using CalcpadViewer.Models;
 using CalcpadViewer.Services;
+using CalcpadViewer.ViewModels;
 using System.Globalization;
 
 namespace CalcpadViewer;
@@ -15,20 +16,15 @@ public partial class MainWindow : Window
     private IMinioClient? _minioClient;
     private string _workingBucketName = "calcpad-storage-working";
     private string _stableBucketName = "calcpad-storage-stable";
-    private List<BlobMetadata> _files = new();
-    private List<BlobMetadata> _allFiles = new(); // Store all files for filtering
     private IUserService? _userService;
-    private List<User> _users = new();
-    private User? _selectedUser;
     private User? _currentUser;
-    private string _currentCategoryFilter = "All";
-    private PreDefinedTag? _currentTagFilter;
-    private List<PreDefinedTag> _tags = new();
-    private PreDefinedTag? _selectedTag;
+    private MainViewModel _viewModel;
 
     public MainWindow()
     {
         InitializeComponent();
+        _viewModel = new MainViewModel();
+        DataContext = _viewModel;
         SecretKeyBox.Password = "calcpad-password-123"; // Default password
         AdminPasswordBox.Password = "admin123"; // Default admin password
         InitializeUserRoleComboBox();
@@ -179,11 +175,11 @@ public partial class MainWindow : Window
             {
                 case "AdminTab":
                     if (_userService != null)
-                        await LoadUsers();
+                        await _viewModel.LoadUsersAsync();
                     break;
                 case "TagsTab":
                     if (_userService != null)
-                        await LoadTags();
+                        await _viewModel.LoadTagsAsync();
                     break;
                 case "FilesTab":
                     System.Diagnostics.Debug.WriteLine("FilesTab selected");
@@ -762,7 +758,7 @@ public partial class MainWindow : Window
     // Admin tab event handlers
     private async void RefreshUsersButton_Click(object sender, RoutedEventArgs e)
     {
-        await LoadUsers();
+        await _viewModel.LoadUsersAsync();
     }
 
     private async void AddUserButton_Click(object sender, RoutedEventArgs e)
@@ -829,54 +825,6 @@ public partial class MainWindow : Window
     }
 
     // Admin helper methods
-    private async Task LoadUsers()
-    {
-        if (_userService == null) return;
-
-        try
-        {
-            StatusText.Text = "Loading users...";
-            RefreshUsersButton.IsEnabled = false;
-            
-            // Remember the currently selected user to restore after updating ItemsSource
-            var currentSelectedUserId = _selectedUser?.Id;
-            
-            _users = await _userService.GetAllUsersAsync();
-            
-            // Temporarily disable selection changed event to prevent loops
-            UsersDataGrid.SelectionChanged -= UsersDataGrid_SelectionChanged;
-            UsersDataGrid.ItemsSource = _users;
-            
-            // Restore the previously selected user if it still exists
-            if (!string.IsNullOrEmpty(currentSelectedUserId) && _users != null)
-            {
-                var userToReselect = _users.FirstOrDefault(u => u.Id == currentSelectedUserId);
-                if (userToReselect != null)
-                {
-                    UsersDataGrid.SelectedItem = userToReselect;
-                    _selectedUser = userToReselect;
-                }
-                else
-                {
-                    _selectedUser = null;
-                }
-            }
-            
-            // Re-enable selection changed event
-            UsersDataGrid.SelectionChanged += UsersDataGrid_SelectionChanged;
-            
-            StatusText.Text = $"Loaded {_users.Count} users";
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Failed to load users: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to load users";
-        }
-        finally
-        {
-            RefreshUsersButton.IsEnabled = true;
-        }
-    }
 
     private async Task CreateUser(RegisterRequest request)
     {
@@ -892,7 +840,7 @@ public partial class MainWindow : Window
             StatusText.Text = $"User '{newUser.Username}' created successfully";
             MessageBox.Show($"User '{newUser.Username}' created successfully!", "User Created", MessageBoxButton.OK, MessageBoxImage.Information);
             
-            await LoadUsers();
+            await _viewModel.LoadUsersAsync();
         }
         catch (Exception ex)
         {
@@ -919,7 +867,7 @@ public partial class MainWindow : Window
             StatusText.Text = $"User '{updatedUser.Username}' updated successfully";
             MessageBox.Show($"User '{updatedUser.Username}' updated successfully!", "User Updated", MessageBoxButton.OK, MessageBoxImage.Information);
             
-            await LoadUsers();
+            await _viewModel.LoadUsersAsync();
         }
         catch (Exception ex)
         {
@@ -947,7 +895,7 @@ public partial class MainWindow : Window
             {
                 StatusText.Text = "User deleted successfully";
                 MessageBox.Show("User deleted successfully!", "User Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
-                await LoadUsers();
+                await _viewModel.LoadUsersAsync();
                 ClearUserDetailsDisplay();
             }
             else
@@ -1178,7 +1126,7 @@ public partial class MainWindow : Window
     // Tags management event handlers
     private async void RefreshTagsButton_Click(object sender, RoutedEventArgs e)
     {
-        await LoadTags();
+        await _viewModel.LoadTagsAsync();
     }
 
     private async void AddTagButton_Click(object sender, RoutedEventArgs e)
@@ -1263,79 +1211,6 @@ public partial class MainWindow : Window
     }
 
     // Tags helper methods
-    private async Task LoadTags()
-    {
-        if (_userService == null) return;
-
-        try
-        {
-            StatusText.Text = "Loading tags...";
-            RefreshTagsButton.IsEnabled = false;
-            
-            // Remember the currently selected tag filter to restore after updating ItemsSource
-            var currentTagFilterName = _currentTagFilter?.Name;
-            
-            // Remember the currently selected tag in the TagsListBox
-            var currentSelectedTagId = _selectedTag?.Id;
-            
-            _tags = await _userService.GetAllTagsAsync();
-            
-            // Temporarily disable selection changed events to prevent loops
-            TagsListBox.SelectionChanged -= TagsListBox_SelectionChanged;
-            TagsListBox.ItemsSource = _tags;
-            TagsListBox.DisplayMemberPath = "Name";
-            
-            // Restore the previously selected tag in TagsListBox if it still exists
-            if (currentSelectedTagId.HasValue && _tags != null)
-            {
-                var tagToReselect = _tags.FirstOrDefault(t => t.Id == currentSelectedTagId.Value);
-                if (tagToReselect != null)
-                {
-                    TagsListBox.SelectedItem = tagToReselect;
-                    _selectedTag = tagToReselect;
-                }
-                else
-                {
-                    _selectedTag = null;
-                }
-            }
-            
-            // Re-enable TagsListBox selection changed event
-            TagsListBox.SelectionChanged += TagsListBox_SelectionChanged;
-            
-            // Also update the tag filter dropdown with selection persistence
-            TagFilterComboBox.SelectionChanged -= TagFilterComboBox_SelectionChanged;
-            TagFilterComboBox.ItemsSource = _tags;
-            
-            // Restore the previously selected tag if it still exists
-            if (!string.IsNullOrEmpty(currentTagFilterName) && _tags != null)
-            {
-                var tagToReselect = _tags.FirstOrDefault(t => t.Name == currentTagFilterName);
-                if (tagToReselect != null)
-                {
-                    TagFilterComboBox.SelectedItem = tagToReselect;
-                    _currentTagFilter = tagToReselect;
-                }
-                else
-                {
-                    _currentTagFilter = null;
-                }
-            }
-            
-            TagFilterComboBox.SelectionChanged += TagFilterComboBox_SelectionChanged;
-            
-            StatusText.Text = $"Loaded {_tags.Count} tags";
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Failed to load tags: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to load tags";
-        }
-        finally
-        {
-            RefreshTagsButton.IsEnabled = true;
-        }
-    }
 
     private async Task CreateTag(string tagName)
     {
@@ -1350,7 +1225,7 @@ public partial class MainWindow : Window
             
             StatusText.Text = $"Tag '{newTag.Name}' created successfully";
             
-            await LoadTags();
+            await _viewModel.LoadTagsAsync();
         }
         catch (Exception ex)
         {
@@ -1389,7 +1264,7 @@ public partial class MainWindow : Window
             if (success)
             {
                 StatusText.Text = "Tag deleted successfully";
-                await LoadTags();
+                await _viewModel.LoadTagsAsync();
                 await LoadFiles(); // Refresh files to show updated tags
                 ClearTagDetailsDisplay();
             }
