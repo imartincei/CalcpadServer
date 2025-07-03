@@ -1,7 +1,9 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using Microsoft.Win32;
 using CalcpadViewer.Models;
+using CalcpadViewer.Services;
 
 namespace CalcpadViewer;
 
@@ -12,9 +14,17 @@ public partial class UploadDialog : Window
     public Dictionary<string, string> Tags { get; private set; } = new();
     public MetadataRequest Metadata { get; private set; } = new();
     
-    public UploadDialog()
+    private readonly IUserService? _userService;
+    private List<SelectableTag> _allTags = new();
+    private List<SelectableTag> _filteredTags = new();
+    
+    public UploadDialog(IUserService? userService = null)
     {
         InitializeComponent();
+        _userService = userService;
+        
+        // Load tags when dialog opens
+        Loaded += async (s, e) => await LoadAvailableTags();
     }
 
     private void BrowseButton_Click(object sender, RoutedEventArgs e)
@@ -68,21 +78,14 @@ public partial class UploadDialog : Window
         };
 
 
-        // Parse tags
+        // Parse selected tags
         Tags.Clear();
-        if (!string.IsNullOrWhiteSpace(TagsTextBox.Text))
+        var selectedTags = _allTags.Where(t => t.IsSelected).ToList();
+        var tagIndex = 1;
+        foreach (var tag in selectedTags)
         {
-            var tagList = TagsTextBox.Text.Split(',', StringSplitOptions.RemoveEmptyEntries);
-            var tagIndex = 1;
-            foreach (var tag in tagList)
-            {
-                var trimmedTag = tag.Trim();
-                if (!string.IsNullOrEmpty(trimmedTag))
-                {
-                    Tags[$"tag{tagIndex}"] = trimmedTag;
-                    tagIndex++;
-                }
-            }
+            Tags[$"tag{tagIndex}"] = tag.Name;
+            tagIndex++;
         }
 
         DialogResult = true;
@@ -113,6 +116,80 @@ public partial class UploadDialog : Window
             // Default for unknown extensions
             _ => "Data"
         };
+    }
+
+    private async Task LoadAvailableTags()
+    {
+        if (_userService == null)
+        {
+            // If no user service, show message and disable tag selection
+            TagSearchBox.IsEnabled = false;
+            AvailableTagsListBox.IsEnabled = false;
+            SelectedTagsText.Text = "Tags unavailable (not connected)";
+            return;
+        }
+
+        try
+        {
+            var prefinedTags = await _userService.GetAllTagsAsync();
+            _allTags = prefinedTags.Select(t => new SelectableTag
+            {
+                Id = t.Id,
+                Name = t.Name,
+                IsSelected = false
+            }).ToList();
+
+            _filteredTags = new List<SelectableTag>(_allTags);
+            AvailableTagsListBox.ItemsSource = _filteredTags;
+            UpdateSelectedTagsDisplay();
+        }
+        catch (Exception ex)
+        {
+            // Handle error gracefully
+            TagSearchBox.IsEnabled = false;
+            AvailableTagsListBox.IsEnabled = false;
+            SelectedTagsText.Text = $"Error loading tags: {ex.Message}";
+        }
+    }
+
+    private void TagSearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var searchText = TagSearchBox.Text.ToLower();
+        
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            _filteredTags = new List<SelectableTag>(_allTags);
+        }
+        else
+        {
+            _filteredTags = _allTags.Where(t => t.Name.ToLower().Contains(searchText)).ToList();
+        }
+        
+        AvailableTagsListBox.ItemsSource = _filteredTags;
+    }
+
+    private void AvailableTagsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // Handle selection changes if needed
+    }
+
+    private void TagCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        UpdateSelectedTagsDisplay();
+    }
+
+    private void UpdateSelectedTagsDisplay()
+    {
+        var selectedTags = _allTags.Where(t => t.IsSelected).Select(t => t.Name).ToList();
+        
+        if (selectedTags.Any())
+        {
+            SelectedTagsText.Text = string.Join(", ", selectedTags);
+        }
+        else
+        {
+            SelectedTagsText.Text = "None";
+        }
     }
 }
 

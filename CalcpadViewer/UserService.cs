@@ -12,6 +12,9 @@ public interface IUserService
     Task<User> CreateUserAsync(RegisterRequest request);
     Task<User> UpdateUserAsync(string userId, UpdateUserRequest request);
     Task<bool> DeleteUserAsync(string userId);
+    Task<List<PreDefinedTag>> GetAllTagsAsync();
+    Task<PreDefinedTag> CreateTagAsync(string tagName);
+    Task<bool> DeleteTagAsync(int tagId);
     void SetAuthToken(string token);
 }
 
@@ -141,6 +144,58 @@ public class UserService : IUserService
         catch (Exception ex)
         {
             throw new Exception($"Failed to delete user: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<List<PreDefinedTag>> GetAllTagsAsync()
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/tags");
+            response.EnsureSuccessStatusCode();
+            
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<PreDefinedTag>>(json, _jsonOptions) ?? new List<PreDefinedTag>();
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to get tags: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<PreDefinedTag> CreateTagAsync(string tagName)
+    {
+        try
+        {
+            AddAuthHeader();
+            var request = new { Name = tagName };
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/tags", content);
+            response.EnsureSuccessStatusCode();
+            
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<PreDefinedTag>(responseJson, _jsonOptions)!;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to create tag: {ex.Message}", ex);
+        }
+    }
+
+    public async Task<bool> DeleteTagAsync(int tagId)
+    {
+        try
+        {
+            AddAuthHeader();
+            var response = await _httpClient.DeleteAsync($"{_baseUrl}/api/tags/{tagId}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to delete tag: {ex.Message}", ex);
         }
     }
 

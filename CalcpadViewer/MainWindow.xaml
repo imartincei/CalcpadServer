@@ -58,7 +58,7 @@
             <TabItem Header="Files" x:Name="FilesTab">
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="300"/>
+                        <ColumnDefinition Width="400"/>
                         <ColumnDefinition Width="5"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
@@ -177,6 +177,79 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
+                                </GroupBox>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </GroupBox>
+                </Grid>
+            </TabItem>
+            
+            <!-- Tags Tab -->
+            <TabItem Header="Tags" x:Name="TagsTab" IsEnabled="False">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="400"/>
+                        <ColumnDefinition Width="5"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Tags List -->
+                    <GroupBox Header="Pre-Defined Tags" Grid.Column="0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal">
+                                <Button x:Name="RefreshTagsButton" Content="Refresh" 
+                                        Margin="5" Padding="5" Click="RefreshTagsButton_Click"/>
+                                <Button x:Name="AddTagButton" Content="Add Tag" 
+                                        Margin="0,5,5,5" Padding="5" Click="AddTagButton_Click"/>
+                            </StackPanel>
+                            
+                            <ListBox x:Name="TagsListBox" Grid.Row="1" Margin="5" 
+                                     SelectionChanged="TagsListBox_SelectionChanged"/>
+                        </Grid>
+                    </GroupBox>
+                    
+                    <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" 
+                                  VerticalAlignment="Stretch" Background="LightGray"/>
+                    
+                    <!-- Tag Management Panel -->
+                    <GroupBox Header="Tag Management" Grid.Column="2">
+                        <ScrollViewer>
+                            <StackPanel Margin="10">
+                                <TextBlock x:Name="NoTagSelectionText" Text="Select a tag to manage or add a new one" 
+                                           FontStyle="Italic" Foreground="Gray"/>
+                                
+                                <!-- Tag Details -->
+                                <GroupBox x:Name="TagDetailsGroup" Header="Tag Details" Visibility="Collapsed" Margin="0,0,0,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <Label Grid.Row="0" Grid.Column="0" Content="ID:" FontWeight="Bold"/>
+                                        <TextBlock x:Name="TagIdText" Grid.Row="0" Grid.Column="1" TextWrapping="Wrap"/>
+                                        
+                                        <Label Grid.Row="1" Grid.Column="0" Content="Name:" FontWeight="Bold"/>
+                                        <TextBlock x:Name="TagNameText" Grid.Row="1" Grid.Column="1"/>
+                                    </Grid>
+                                </GroupBox>
+                                
+                                <!-- Tag Actions -->
+                                <GroupBox x:Name="TagActionsGroup" Header="Actions" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button x:Name="DeleteTagButton" Content="Delete Tag" 
+                                                Margin="5" Padding="10,5" Click="DeleteTagButton_Click"
+                                                Background="LightCoral"/>
+                                    </StackPanel>
                                 </GroupBox>
                             </StackPanel>
                         </ScrollViewer>

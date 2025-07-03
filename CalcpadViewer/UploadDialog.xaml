@@ -67,9 +67,37 @@
                 <!-- Tags -->
                 <GroupBox Header="Tags" Margin="0,0,0,10">
                     <StackPanel>
-                        <Label Content="Tags (comma-separated):"/>
-                        <TextBox x:Name="TagsTextBox" Margin="0,5"/>
-                        <TextBlock Text="Example: important, draft, version1" FontStyle="Italic" Foreground="Gray" FontSize="10"/>
+                        <Label Content="Select Tags:"/>
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Search Box -->
+                            <StackPanel Grid.Row="0" Margin="0,5">
+                                <Label Content="Search Tags:" FontSize="10" Margin="0,0,0,-5"/>
+                                <TextBox x:Name="TagSearchBox" TextChanged="TagSearchBox_TextChanged"/>
+                            </StackPanel>
+                            
+                            <!-- Available Tags List -->
+                            <ListBox x:Name="AvailableTagsListBox" Grid.Row="1" Height="100" Margin="0,5"
+                                     SelectionMode="Multiple" SelectionChanged="AvailableTagsListBox_SelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                  Checked="TagCheckBox_Changed" Unchecked="TagCheckBox_Changed"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            
+                            <!-- Selected Tags Display -->
+                            <TextBlock Grid.Row="2" Margin="0,5,0,0">
+                                <Run Text="Selected: " FontWeight="Bold"/>
+                                <Run x:Name="SelectedTagsText" Text="None"/>
+                            </TextBlock>
+                        </Grid>
                     </StackPanel>
                 </GroupBox>
             </StackPanel>

@@ -22,6 +22,8 @@ public partial class MainWindow : Window
     private User? _selectedUser;
     private User? _currentUser;
     private string _currentCategoryFilter = "All";
+    private List<PreDefinedTag> _tags = new();
+    private PreDefinedTag? _selectedTag;
 
     public MainWindow()
     {
@@ -107,6 +109,7 @@ public partial class MainWindow : Window
                     _currentUser = authResponse.User;
                     StatusText.Text = $"Admin logged in: {authResponse.User.Username}";
                     AdminTab.IsEnabled = true;
+                    TagsTab.IsEnabled = true;
                 }
                 catch (Exception authEx)
                 {
@@ -401,7 +404,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var uploadDialog = new UploadDialog();
+        var uploadDialog = new UploadDialog(_userService);
         uploadDialog.Owner = this;
 
         if (uploadDialog.ShowDialog() == true)
@@ -838,11 +841,42 @@ public partial class MainWindow : Window
 
     private async Task DeleteFile(string fileName, string bucketName)
     {
-        var removeObjectArgs = new RemoveObjectArgs()
-            .WithBucket(bucketName)
-            .WithObject(fileName);
+        try
+        {
+            // Get all versions of the file
+            var versions = new List<(string versionId, bool isLatest)>();
+            var listObjectsArgs = new ListObjectsArgs()
+                .WithBucket(bucketName)
+                .WithPrefix(fileName)
+                .WithVersions(true);
 
-        await _minioClient.RemoveObjectAsync(removeObjectArgs);
+            await foreach (var item in _minioClient.ListObjectsEnumAsync(listObjectsArgs))
+            {
+                if (item.Key == fileName) // Exact match only
+                {
+                    versions.Add((item.VersionId ?? "null", item.IsLatest));
+                }
+            }
+
+            // Delete all versions
+            foreach (var (versionId, isLatest) in versions)
+            {
+                var removeObjectArgs = new RemoveObjectArgs()
+                    .WithBucket(bucketName)
+                    .WithObject(fileName);
+
+                if (versionId != "null")
+                {
+                    removeObjectArgs.WithVersionId(versionId);
+                }
+
+                await _minioClient.RemoveObjectAsync(removeObjectArgs);
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to delete all versions of file {fileName}: {ex.Message}", ex);
+        }
     }
 
     private async void ViewVersionsButton_Click(object sender, RoutedEventArgs e)
@@ -874,5 +908,165 @@ public partial class MainWindow : Window
         {
             ViewVersionsButton.IsEnabled = true;
         }
+    }
+
+    // Tags management event handlers
+    private async void RefreshTagsButton_Click(object sender, RoutedEventArgs e)
+    {
+        await LoadTags();
+    }
+
+    private async void AddTagButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_userService == null)
+        {
+            MessageBox.Show("User service not initialized. Please connect first.", "Service Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var addTagDialog = new AddTagDialog();
+        addTagDialog.Owner = this;
+
+        if (addTagDialog.ShowDialog() == true && !string.IsNullOrWhiteSpace(addTagDialog.TagName))
+        {
+            await CreateTag(addTagDialog.TagName);
+        }
+    }
+
+    private void TagsListBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (TagsListBox.SelectedItem is PreDefinedTag selectedTag)
+        {
+            _selectedTag = selectedTag;
+            DisplayTagDetails(selectedTag);
+        }
+        else
+        {
+            _selectedTag = null;
+            ClearTagDetailsDisplay();
+        }
+    }
+
+    private async void DeleteTagButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTag == null || _userService == null) return;
+
+        var result = MessageBox.Show(
+            $"Are you sure you want to delete tag '{_selectedTag.Name}'?", 
+            "Confirm Delete", 
+            MessageBoxButton.YesNo, 
+            MessageBoxImage.Question);
+
+        if (result == MessageBoxResult.Yes)
+        {
+            await DeleteTag(_selectedTag.Id);
+        }
+    }
+
+    // Tags helper methods
+    private async Task LoadTags()
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            StatusText.Text = "Loading tags...";
+            RefreshTagsButton.IsEnabled = false;
+            
+            _tags = await _userService.GetAllTagsAsync();
+            TagsListBox.ItemsSource = _tags;
+            TagsListBox.DisplayMemberPath = "Name";
+            
+            StatusText.Text = $"Loaded {_tags.Count} tags";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to load tags: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to load tags";
+        }
+        finally
+        {
+            RefreshTagsButton.IsEnabled = true;
+        }
+    }
+
+    private async Task CreateTag(string tagName)
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            StatusText.Text = "Creating tag...";
+            AddTagButton.IsEnabled = false;
+
+            var newTag = await _userService.CreateTagAsync(tagName);
+            
+            StatusText.Text = $"Tag '{newTag.Name}' created successfully";
+            MessageBox.Show($"Tag '{newTag.Name}' created successfully!", "Tag Created", MessageBoxButton.OK, MessageBoxImage.Information);
+            
+            await LoadTags();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to create tag: {ex.Message}", "Create Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to create tag";
+        }
+        finally
+        {
+            AddTagButton.IsEnabled = true;
+        }
+    }
+
+    private async Task DeleteTag(int tagId)
+    {
+        if (_userService == null) return;
+
+        try
+        {
+            StatusText.Text = "Deleting tag...";
+            DeleteTagButton.IsEnabled = false;
+
+            var success = await _userService.DeleteTagAsync(tagId);
+            
+            if (success)
+            {
+                StatusText.Text = "Tag deleted successfully";
+                MessageBox.Show("Tag deleted successfully!", "Tag Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadTags();
+                ClearTagDetailsDisplay();
+            }
+            else
+            {
+                MessageBox.Show("Failed to delete tag.", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = "Failed to delete tag";
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to delete tag: {ex.Message}", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            StatusText.Text = "Failed to delete tag";
+        }
+        finally
+        {
+            DeleteTagButton.IsEnabled = true;
+        }
+    }
+
+    private void DisplayTagDetails(PreDefinedTag tag)
+    {
+        NoTagSelectionText.Visibility = Visibility.Collapsed;
+        TagDetailsGroup.Visibility = Visibility.Visible;
+        TagActionsGroup.Visibility = Visibility.Visible;
+
+        TagIdText.Text = tag.Id.ToString();
+        TagNameText.Text = tag.Name;
+    }
+
+    private void ClearTagDetailsDisplay()
+    {
+        NoTagSelectionText.Visibility = Visibility.Visible;
+        TagDetailsGroup.Visibility = Visibility.Collapsed;
+        TagActionsGroup.Visibility = Visibility.Collapsed;
+        _selectedTag = null;
     }
 }

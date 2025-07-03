@@ -36,6 +36,7 @@ builder.Services.AddSingleton<IMinioClient>(provider =>
 
 builder.Services.AddScoped<IBlobStorageService, BlobStorageService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ITagsService, TagsService>();
 
 // Add JWT Authentication
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "your-super-secret-key-here-change-in-production";

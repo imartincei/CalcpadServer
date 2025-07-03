@@ -237,13 +237,41 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
     {
         try
         {
-            var removeObjectArgs = new RemoveObjectArgs()
-                .WithBucket(_bucketName)
-                .WithObject(fileName);
-
-            await _minioClient.RemoveObjectAsync(removeObjectArgs);
+            // Determine bucket based on file category from metadata
+            var targetBucket = await DetermineBucketForFile(fileName);
             
-            _logger.LogInformation("File {FileName} deleted successfully", fileName);
+            // Get all versions of the file
+            var versions = new List<(string versionId, bool isLatest)>();
+            var listObjectsArgs = new ListObjectsArgs()
+                .WithBucket(targetBucket)
+                .WithPrefix(fileName)
+                .WithVersions(true);
+
+            await foreach (var item in _minioClient.ListObjectsEnumAsync(listObjectsArgs))
+            {
+                if (item.Key == fileName) // Exact match only
+                {
+                    versions.Add((item.VersionId ?? "null", item.IsLatest));
+                }
+            }
+
+            // Delete all versions
+            foreach (var (versionId, isLatest) in versions)
+            {
+                var removeObjectArgs = new RemoveObjectArgs()
+                    .WithBucket(targetBucket)
+                    .WithObject(fileName);
+
+                if (versionId != "null")
+                {
+                    removeObjectArgs.WithVersionId(versionId);
+                }
+
+                await _minioClient.RemoveObjectAsync(removeObjectArgs);
+                _logger.LogInformation("Deleted version {VersionId} of file {FileName}", versionId, fileName);
+            }
+            
+            _logger.LogInformation("All versions of file {FileName} deleted successfully from bucket {Bucket}", fileName, targetBucket);
             return true;
         }
         catch (Exception ex)

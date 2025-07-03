@@ -31,7 +31,10 @@ services:
       echo 'MinIO is ready, creating buckets...' &&
       mc mb minio/calcpad-storage-working --ignore-existing &&
       mc mb minio/calcpad-storage-stable --ignore-existing &&
-      echo 'Buckets created successfully'
+      echo 'Enabling versioning on buckets...' &&
+      mc version enable minio/calcpad-storage-working &&
+      mc version enable minio/calcpad-storage-stable &&
+      echo 'Buckets created and versioning enabled successfully'
       "
 
   calcpad-api:

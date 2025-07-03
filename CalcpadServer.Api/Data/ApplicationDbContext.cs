@@ -11,6 +11,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<User> Users { get; set; }
+    public DbSet<PreDefinedTag> PreDefinedTags { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -25,6 +26,14 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.PasswordHash).IsRequired();
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
+        });
+
+        // Configure PreDefinedTag entity
+        modelBuilder.Entity<PreDefinedTag>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.HasIndex(e => e.Name).IsUnique();
         });
     }
 }
