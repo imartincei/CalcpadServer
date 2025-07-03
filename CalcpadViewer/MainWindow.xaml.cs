@@ -42,7 +42,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            StatusText.Text = "Connecting...";
+            _viewModel.StatusText = "Connecting...";
             ConnectButton.IsEnabled = false;
 
             var endpoint = EndpointTextBox.Text.Trim();
@@ -83,7 +83,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            StatusText.Text = "Connected successfully";
+            _viewModel.StatusText = "Connected successfully";
             RefreshButton.IsEnabled = true;
             UploadButton.IsEnabled = true;
             DownloadButton.IsEnabled = true;
@@ -93,6 +93,7 @@ public partial class MainWindow : Window
             // Initialize user service and try admin login
             var apiBaseUrl = $"http{(useSSL ? "s" : "")}://{endpoint.Replace(":9000", ":5159")}"; // API is on port 5159
             _userService = new UserService(apiBaseUrl);
+            _viewModel.SetUserService(_userService);
             
             // Attempt admin login if credentials provided
             var adminUsername = AdminUsernameTextBox.Text.Trim();
@@ -102,22 +103,22 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    StatusText.Text = "Logging in admin user...";
+                    _viewModel.StatusText = "Logging in admin user...";
                     var authResponse = await _userService.LoginAsync(adminUsername, adminPassword);
                     _currentUser = authResponse.User;
-                    StatusText.Text = $"Admin logged in: {authResponse.User.Username}";
+                    _viewModel.StatusText = $"Admin logged in: {authResponse.User.Username}";
                     AdminTab.IsEnabled = true;
                     TagsTab.IsEnabled = true;
                 }
                 catch (Exception authEx)
                 {
                     MessageBox.Show($"Admin login failed: {authEx.Message}", "Login Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    StatusText.Text = "Connected (no admin access)";
+                    _viewModel.StatusText = "Connected (no admin access)";
                 }
             }
             else
             {
-                StatusText.Text = "Connected (no admin credentials)";
+                _viewModel.StatusText = "Connected (no admin credentials)";
             }
             
             await LoadFiles();
@@ -125,7 +126,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Connection failed: {ex.Message}", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Connection failed";
+            _viewModel.StatusText = "Connection failed";
         }
         finally
         {
@@ -265,7 +266,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to load files: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to load files";
+            _viewModel.StatusText = "Failed to load files";
         }
         finally
         {
@@ -393,7 +394,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Exception in FilterFilesByCategory: {ex}");
-            StatusText.Text = "Error filtering files";
+            _viewModel.StatusText = "Error filtering files";
         }
     }
 
@@ -657,7 +658,7 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Uploading file...";
+            _viewModel.StatusText = "Uploading file...";
             UploadButton.IsEnabled = false;
             
             // Determine bucket based on FileCategory - only "Working" goes to working bucket, all others go to stable
@@ -718,11 +719,11 @@ public partial class MainWindow : Window
                 catch (Exception tagEx)
                 {
                     // If tagging fails, log but don't fail the upload
-                    StatusText.Text = $"File uploaded but tagging failed: {tagEx.Message}";
+                    _viewModel.StatusText = $"File uploaded but tagging failed: {tagEx.Message}";
                 }
             }
             
-            StatusText.Text = $"File '{fileName}' uploaded successfully";
+            _viewModel.StatusText = $"File '{fileName}' uploaded successfully";
             MessageBox.Show($"File '{fileName}' uploaded successfully!", "Upload Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             
             // Refresh the file list
@@ -731,7 +732,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Upload failed: {ex.Message}", "Upload Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Upload failed";
+            _viewModel.StatusText = "Upload failed";
         }
         finally
         {
@@ -833,12 +834,12 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Creating user...";
+            _viewModel.StatusText = "Creating user...";
             AddUserButton.IsEnabled = false;
 
             var newUser = await _userService.CreateUserAsync(request);
             
-            StatusText.Text = $"User '{newUser.Username}' created successfully";
+            _viewModel.StatusText = $"User '{newUser.Username}' created successfully";
             MessageBox.Show($"User '{newUser.Username}' created successfully!", "User Created", MessageBoxButton.OK, MessageBoxImage.Information);
             
             await _viewModel.LoadUsersAsync();
@@ -846,7 +847,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to create user: {ex.Message}", "Create Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to create user";
+            _viewModel.StatusText = "Failed to create user";
         }
         finally
         {
@@ -860,12 +861,12 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Updating user...";
+            _viewModel.StatusText = "Updating user...";
             UpdateUserButton.IsEnabled = false;
 
             var updatedUser = await _userService.UpdateUserAsync(userId, request);
             
-            StatusText.Text = $"User '{updatedUser.Username}' updated successfully";
+            _viewModel.StatusText = $"User '{updatedUser.Username}' updated successfully";
             MessageBox.Show($"User '{updatedUser.Username}' updated successfully!", "User Updated", MessageBoxButton.OK, MessageBoxImage.Information);
             
             await _viewModel.LoadUsersAsync();
@@ -873,7 +874,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to update user: {ex.Message}", "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to update user";
+            _viewModel.StatusText = "Failed to update user";
         }
         finally
         {
@@ -887,14 +888,14 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Deleting user...";
+            _viewModel.StatusText = "Deleting user...";
             DeleteUserButton.IsEnabled = false;
 
             var success = await _userService.DeleteUserAsync(userId);
             
             if (success)
             {
-                StatusText.Text = "User deleted successfully";
+                _viewModel.StatusText = "User deleted successfully";
                 MessageBox.Show("User deleted successfully!", "User Deleted", MessageBoxButton.OK, MessageBoxImage.Information);
                 await _viewModel.LoadUsersAsync();
                 ClearUserDetailsDisplay();
@@ -902,13 +903,13 @@ public partial class MainWindow : Window
             else
             {
                 MessageBox.Show("Failed to delete user.", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                StatusText.Text = "Failed to delete user";
+                _viewModel.StatusText = "Failed to delete user";
             }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to delete user: {ex.Message}", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to delete user";
+            _viewModel.StatusText = "Failed to delete user";
         }
         finally
         {
@@ -959,7 +960,7 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Downloading file...";
+            _viewModel.StatusText = "Downloading file...";
             DownloadButton.IsEnabled = false;
 
             // Show save file dialog
@@ -974,17 +975,17 @@ public partial class MainWindow : Window
             {
                 await DownloadFile(actualFileName, saveFileDialog.FileName, bucketName);
                 MessageBox.Show($"File downloaded successfully to:\n{saveFileDialog.FileName}", "Download Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-                StatusText.Text = "Download completed";
+                _viewModel.StatusText = "Download completed";
             }
             else
             {
-                StatusText.Text = "Download cancelled";
+                _viewModel.StatusText = "Download cancelled";
             }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to download file: {ex.Message}", "Download Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Download failed";
+            _viewModel.StatusText = "Download failed";
         }
         finally
         {
@@ -1030,13 +1031,13 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Deleting file...";
+            _viewModel.StatusText = "Deleting file...";
             DeleteButton.IsEnabled = false;
 
             await DeleteFile(actualFileName, bucketName);
             
             MessageBox.Show($"File '{actualFileName}' deleted successfully.", "Delete Complete", MessageBoxButton.OK, MessageBoxImage.Information);
-            StatusText.Text = "File deleted successfully";
+            _viewModel.StatusText = "File deleted successfully";
             
             // Refresh the file list and clear metadata display
             await LoadFiles();
@@ -1045,7 +1046,7 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to delete file: {ex.Message}", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Delete failed";
+            _viewModel.StatusText = "Delete failed";
         }
         finally
         {
@@ -1103,7 +1104,7 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Loading file versions...";
+            _viewModel.StatusText = "Loading file versions...";
             ViewVersionsButton.IsEnabled = false;
 
             // Create a window to show versions
@@ -1111,12 +1112,12 @@ public partial class MainWindow : Window
             versionsWindow.Owner = this;
             versionsWindow.ShowDialog();
 
-            StatusText.Text = "Ready";
+            _viewModel.StatusText = "Ready";
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to load file versions: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to load versions";
+            _viewModel.StatusText = "Failed to load versions";
         }
         finally
         {
@@ -1219,19 +1220,19 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Creating tag...";
+            _viewModel.StatusText = "Creating tag...";
             AddTagButton.IsEnabled = false;
 
             var newTag = await _userService.CreateTagAsync(tagName);
             
-            StatusText.Text = $"Tag '{newTag.Name}' created successfully";
+            _viewModel.StatusText = $"Tag '{newTag.Name}' created successfully";
             
             await _viewModel.LoadTagsAsync();
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to create tag: {ex.Message}", "Create Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to create tag";
+            _viewModel.StatusText = "Failed to create tag";
         }
         finally
         {
@@ -1245,26 +1246,26 @@ public partial class MainWindow : Window
 
         try
         {
-            StatusText.Text = "Finding files with tag...";
+            _viewModel.StatusText = "Finding files with tag...";
             DeleteTagButton.IsEnabled = false;
 
             // Get the tag name before deletion for searching files
             var tagToDelete = _viewModel.SelectedTag;
             if (tagToDelete == null) return;
 
-            StatusText.Text = "Removing tag from files...";
+            _viewModel.StatusText = "Removing tag from files...";
             
             // Find all files that have this tag and remove it
             await RemoveTagFromAllFiles(tagToDelete.Name);
 
-            StatusText.Text = "Deleting tag...";
+            _viewModel.StatusText = "Deleting tag...";
             
             // Now delete the tag from the database
             var success = await _userService.DeleteTagAsync(tagId);
             
             if (success)
             {
-                StatusText.Text = "Tag deleted successfully";
+                _viewModel.StatusText = "Tag deleted successfully";
                 await _viewModel.LoadTagsAsync();
                 await LoadFiles(); // Refresh files to show updated tags
                 ClearTagDetailsDisplay();
@@ -1272,13 +1273,13 @@ public partial class MainWindow : Window
             else
             {
                 MessageBox.Show("Failed to delete tag.", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                StatusText.Text = "Failed to delete tag";
+                _viewModel.StatusText = "Failed to delete tag";
             }
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Failed to delete tag: {ex.Message}", "Delete Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            StatusText.Text = "Failed to delete tag";
+            _viewModel.StatusText = "Failed to delete tag";
         }
         finally
         {
@@ -1328,7 +1329,7 @@ public partial class MainWindow : Window
 
             if (filesWithTag.Any())
             {
-                StatusText.Text = $"Removed tag from {filesWithTag.Count} file(s)";
+                _viewModel.StatusText = $"Removed tag from {filesWithTag.Count} file(s)";
             }
         }
         catch (Exception ex)

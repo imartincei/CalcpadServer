@@ -137,15 +137,32 @@ public class MainViewModel : INotifyPropertyChanged
         _userService = userService;
     }
     
+    public void SetUserService(IUserService userService)
+    {
+        _userService = userService;
+    }
+    
     public async Task LoadUsersAsync()
     {
-        if (_userService == null || IsLoadingUsers) return;
+        System.Diagnostics.Debug.WriteLine("LoadUsersAsync called");
+        if (_userService == null)
+        {
+            System.Diagnostics.Debug.WriteLine("_userService is null, cannot load users");
+            return;
+        }
+        if (IsLoadingUsers)
+        {
+            System.Diagnostics.Debug.WriteLine("Already loading users, skipping");
+            return;
+        }
         
         IsLoadingUsers = true;
         try
         {
             StatusText = "Loading users...";
+            System.Diagnostics.Debug.WriteLine("Calling _userService.GetAllUsersAsync()");
             var users = await _userService.GetAllUsersAsync();
+            System.Diagnostics.Debug.WriteLine($"Retrieved {users?.Count ?? 0} users");
             
             // Clear and repopulate the collection
             Users.Clear();
@@ -168,13 +185,25 @@ public class MainViewModel : INotifyPropertyChanged
     
     public async Task LoadTagsAsync()
     {
-        if (_userService == null || IsLoadingTags) return;
+        System.Diagnostics.Debug.WriteLine("LoadTagsAsync called");
+        if (_userService == null)
+        {
+            System.Diagnostics.Debug.WriteLine("_userService is null, cannot load tags");
+            return;
+        }
+        if (IsLoadingTags)
+        {
+            System.Diagnostics.Debug.WriteLine("Already loading tags, skipping");
+            return;
+        }
         
         IsLoadingTags = true;
         try
         {
             StatusText = "Loading tags...";
+            System.Diagnostics.Debug.WriteLine("Calling _userService.GetAllTagsAsync()");
             var tags = await _userService.GetAllTagsAsync();
+            System.Diagnostics.Debug.WriteLine($"Retrieved {tags?.Count ?? 0} tags");
             
             // Clear and repopulate the collection
             Tags.Clear();
