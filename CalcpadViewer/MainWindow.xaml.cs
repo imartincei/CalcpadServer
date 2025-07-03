@@ -183,6 +183,9 @@ public partial class MainWindow : Window
 
     private void TagFilterComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // Debug: Log when this event is triggered
+        System.Diagnostics.Debug.WriteLine($"TagFilterComboBox_SelectionChanged - SelectedItem: {TagFilterComboBox.SelectedItem}");
+        
         if (TagFilterComboBox.SelectedItem is PreDefinedTag selectedTag)
         {
             _currentTagFilter = selectedTag;
