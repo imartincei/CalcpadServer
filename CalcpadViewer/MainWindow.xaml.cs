@@ -412,6 +412,10 @@ public partial class MainWindow : Window
 
         try
         {
+            // Remember the currently selected tag to restore after updating ItemsSource
+            var currentTagFilterName = _currentTagFilter?.Name;
+            System.Diagnostics.Debug.WriteLine($"Current tag filter: {currentTagFilterName ?? "none"}");
+            
             System.Diagnostics.Debug.WriteLine("Calling GetAllTagsAsync...");
             var tags = await _userService.GetAllTagsAsync();
             System.Diagnostics.Debug.WriteLine($"Retrieved {tags?.Count ?? 0} tags");
@@ -424,8 +428,31 @@ public partial class MainWindow : Window
                 }
             }
             
+            // Temporarily disable the selection changed event to prevent triggering filter
+            TagFilterComboBox.SelectionChanged -= TagFilterComboBox_SelectionChanged;
             TagFilterComboBox.ItemsSource = tags;
-            System.Diagnostics.Debug.WriteLine("Set TagFilterComboBox.ItemsSource");
+            
+            // Restore the previously selected tag if it still exists
+            if (!string.IsNullOrEmpty(currentTagFilterName) && tags != null)
+            {
+                var tagToReselect = tags.FirstOrDefault(t => t.Name == currentTagFilterName);
+                if (tagToReselect != null)
+                {
+                    TagFilterComboBox.SelectedItem = tagToReselect;
+                    _currentTagFilter = tagToReselect;
+                    System.Diagnostics.Debug.WriteLine($"Restored tag filter selection: {tagToReselect.Name}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"Previously selected tag '{currentTagFilterName}' no longer exists");
+                    _currentTagFilter = null;
+                }
+            }
+            
+            // Re-enable the selection changed event
+            TagFilterComboBox.SelectionChanged += TagFilterComboBox_SelectionChanged;
+            
+            System.Diagnostics.Debug.WriteLine("Set TagFilterComboBox.ItemsSource and restored selection");
         }
         catch (Exception ex)
         {
@@ -811,8 +838,26 @@ public partial class MainWindow : Window
             StatusText.Text = "Loading users...";
             RefreshUsersButton.IsEnabled = false;
             
+            // Remember the currently selected user to restore after updating ItemsSource
+            var currentSelectedUserId = _selectedUser?.Id;
+            
             _users = await _userService.GetAllUsersAsync();
             UsersDataGrid.ItemsSource = _users;
+            
+            // Restore the previously selected user if it still exists
+            if (!string.IsNullOrEmpty(currentSelectedUserId) && _users != null)
+            {
+                var userToReselect = _users.FirstOrDefault(u => u.Id == currentSelectedUserId);
+                if (userToReselect != null)
+                {
+                    UsersDataGrid.SelectedItem = userToReselect;
+                    _selectedUser = userToReselect;
+                }
+                else
+                {
+                    _selectedUser = null;
+                }
+            }
             
             StatusText.Text = $"Loaded {_users.Count} users";
         }
@@ -1221,12 +1266,51 @@ public partial class MainWindow : Window
             StatusText.Text = "Loading tags...";
             RefreshTagsButton.IsEnabled = false;
             
+            // Remember the currently selected tag filter to restore after updating ItemsSource
+            var currentTagFilterName = _currentTagFilter?.Name;
+            
+            // Remember the currently selected tag in the TagsListBox
+            var currentSelectedTagId = _selectedTag?.Id;
+            
             _tags = await _userService.GetAllTagsAsync();
             TagsListBox.ItemsSource = _tags;
             TagsListBox.DisplayMemberPath = "Name";
             
-            // Also update the tag filter dropdown
+            // Restore the previously selected tag in TagsListBox if it still exists
+            if (currentSelectedTagId.HasValue && _tags != null)
+            {
+                var tagToReselect = _tags.FirstOrDefault(t => t.Id == currentSelectedTagId.Value);
+                if (tagToReselect != null)
+                {
+                    TagsListBox.SelectedItem = tagToReselect;
+                    _selectedTag = tagToReselect;
+                }
+                else
+                {
+                    _selectedTag = null;
+                }
+            }
+            
+            // Also update the tag filter dropdown with selection persistence
+            TagFilterComboBox.SelectionChanged -= TagFilterComboBox_SelectionChanged;
             TagFilterComboBox.ItemsSource = _tags;
+            
+            // Restore the previously selected tag if it still exists
+            if (!string.IsNullOrEmpty(currentTagFilterName) && _tags != null)
+            {
+                var tagToReselect = _tags.FirstOrDefault(t => t.Name == currentTagFilterName);
+                if (tagToReselect != null)
+                {
+                    TagFilterComboBox.SelectedItem = tagToReselect;
+                    _currentTagFilter = tagToReselect;
+                }
+                else
+                {
+                    _currentTagFilter = null;
+                }
+            }
+            
+            TagFilterComboBox.SelectionChanged += TagFilterComboBox_SelectionChanged;
             
             StatusText.Text = $"Loaded {_tags.Count} tags";
         }
