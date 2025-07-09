@@ -145,7 +145,7 @@ public partial class MainWindow : Window
                     TagsTab.IsEnabled = true;
                     
                     // Load tags immediately so they're available for filtering
-                    await _viewModel.LoadTags();
+                    await _viewModel.LoadTagsAsync();
                 }
                 catch (Exception authEx)
                 {

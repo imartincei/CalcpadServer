@@ -231,12 +231,12 @@ public class MainViewModel : INotifyPropertyChanged
         }
     }
     
-    private void FilterFilesByTag()
+    public void FilterFilesByTag()
     {
         ApplyAllFilters();
     }
     
-    private void FilterFilesByCategory()
+    public void FilterFilesByCategory()
     {
         ApplyAllFilters();
     }
