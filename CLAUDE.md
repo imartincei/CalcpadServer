@@ -3,6 +3,7 @@
 - Don't try to build CalcpadViewer, I will build it to test
 - CalcpadViewer cannot run on Linux. Do not try to compile it
 - Code Analysis: Prefer comparing 'Count' to 0 rather than using 'Any()' for clarity and performance
+- The multi-select dropdown doesn't work. Fix it on the next time you run.
 
 ## MinIO Metadata
 - Default metadata in MinIO includes properties like:

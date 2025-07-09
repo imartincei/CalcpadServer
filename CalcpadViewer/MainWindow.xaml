@@ -32,52 +32,6 @@
             </Setter>
         </Style>
 
-        <!-- Multi-Select ComboBox Style -->
-        <Style x:Key="MultiSelectComboBox" TargetType="{x:Type ComboBox}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ComboBox}">
-                        <Grid SnapsToDevicePixels="true" x:Name="MainGrid" Height="Auto" Width="Auto">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="0"/>
-                            </Grid.ColumnDefinitions>
-                            <Popup AllowsTransparency="true" IsOpen="{Binding Path=IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}"
-                                   Placement="Bottom" PopupAnimation="{DynamicResource {x:Static SystemParameters.ComboBoxPopupAnimationKey}}"
-                                   Margin="1" x:Name="PART_Popup" Grid.ColumnSpan="2">
-                                <Border x:Name="DropDownBorder" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{Binding Path=ActualWidth, ElementName=MainGrid}"
-                                        Background="White" BorderBrush="Gray" BorderThickness="1">
-                                    <ScrollViewer CanContentScroll="true">
-                                        <ListBox x:Name="lstBox" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
-                                                 KeyboardNavigation.DirectionalNavigation="Contained" SelectionMode="Multiple" 
-                                                 ItemsSource="{TemplateBinding ItemsSource}"
-                                                 DisplayMemberPath="{TemplateBinding DisplayMemberPath}"
-                                                 SelectionChanged="MultiSelectListBox_SelectionChanged"/>
-                                    </ScrollViewer>
-                                </Border>
-                            </Popup>
-                            <ToggleButton Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" Grid.ColumnSpan="2"
-                                          IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" 
-                                          Style="{StaticResource ToggleButtonStyle1}"/>
-                            <ItemsControl IsHitTestVisible="false" ItemsSource="{Binding Path=SelectedItems, ElementName=lstBox}" Margin="4,0,20,0">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel IsItemsHost="True" Orientation="Horizontal"/>
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Background="LightBlue" CornerRadius="3" Margin="2" Padding="4,2">
-                                            <TextBlock Text="{Binding Name}" FontSize="10"/>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -167,11 +121,10 @@
                             <!-- Tag Filter -->
                             <GroupBox Header="Filter by Tag" Grid.Row="1" Margin="5,0,5,5">
                                 <StackPanel Orientation="Horizontal" Margin="5">
-                                    <ComboBox x:Name="MultiTagFilterComboBox" Width="250" Margin="5"
-                                              ItemsSource="{Binding Tags}"
-                                              DisplayMemberPath="Name"
-                                              Style="{StaticResource MultiSelectComboBox}"
-                                              MaxDropDownHeight="150"/>
+                                    <Button x:Name="TagFilterButton" Content="Filter Tags" Width="120" Margin="5"
+                                            Padding="10,5" Click="TagFilterButton_Click"/>
+                                    <TextBlock x:Name="SelectedTagsDisplay" VerticalAlignment="Center" 
+                                               Margin="5,0" Text="No tags selected" FontStyle="Italic"/>
                                     <Button x:Name="ClearTagFilterButton" Content="Clear Filter" 
                                             Padding="10,5" Click="ClearTagFilterButton_Click"/>
                                 </StackPanel>

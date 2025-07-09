@@ -36,6 +36,9 @@ public partial class MainWindow : Window
         SecretKeyBox.Password = "calcpad-password-123"; // Default password
         AdminPasswordBox.Password = "admin123"; // Default admin password
         InitializeUserRoleComboBox();
+        
+        // Initialize selected tags display
+        UpdateSelectedTagsDisplay();
     }
     
     private void OnTagSelectionChanged(PreDefinedTag? selectedTag)
@@ -251,27 +254,49 @@ public partial class MainWindow : Window
     }
 
 
-    private void ClearTagFilterButton_Click(object sender, RoutedEventArgs e)
+    private void TagFilterButton_Click(object sender, RoutedEventArgs e)
     {
-        // Clear the multi-select ComboBox
-        var listBox = (ListBox)MultiTagFilterComboBox.Template.FindName("lstBox", MultiTagFilterComboBox);
-        listBox?.SelectedItems.Clear();
+        var dialog = new TagFilterDialog(_viewModel.Tags.ToList(), _viewModel.SelectedTagFilters.ToList());
+        dialog.Owner = this;
         
-        _viewModel.SelectedTagFilters.Clear();
-        FilterFilesByCategory();
-    }
-    
-    private void MultiSelectListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (sender is ListBox listBox)
+        if (dialog.ShowDialog() == true)
         {
-            // Update the ViewModel's SelectedTagFilters collection
             _viewModel.SelectedTagFilters.Clear();
-            
-            foreach (PreDefinedTag tag in listBox.SelectedItems)
+            foreach (var tag in dialog.SelectedTags)
             {
                 _viewModel.SelectedTagFilters.Add(tag);
             }
+            
+            UpdateSelectedTagsDisplay();
+            FilterFilesByCategory();
+        }
+    }
+    
+    private void ClearTagFilterButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SelectedTagFilters.Clear();
+        UpdateSelectedTagsDisplay();
+        FilterFilesByCategory();
+    }
+    
+    private void UpdateSelectedTagsDisplay()
+    {
+        var selectedCount = _viewModel.SelectedTagFilters.Count;
+        
+        if (selectedCount == 0)
+        {
+            SelectedTagsDisplay.Text = "No tags selected";
+            SelectedTagsDisplay.FontStyle = FontStyles.Italic;
+        }
+        else if (selectedCount == 1)
+        {
+            SelectedTagsDisplay.Text = $"1 tag: {_viewModel.SelectedTagFilters[0].Name}";
+            SelectedTagsDisplay.FontStyle = FontStyles.Normal;
+        }
+        else
+        {
+            SelectedTagsDisplay.Text = $"{selectedCount} tags selected";
+            SelectedTagsDisplay.FontStyle = FontStyles.Normal;
         }
     }
 
