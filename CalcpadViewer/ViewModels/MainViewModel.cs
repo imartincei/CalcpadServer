@@ -233,39 +233,46 @@ public class MainViewModel : INotifyPropertyChanged
     
     private void FilterFilesByTag()
     {
-        Files.Clear();
-        
-        if (SelectedTagFilters.Count == 0)
-        {
-            // No tags selected, show all files
-            foreach (var file in AllFiles)
-            {
-                Files.Add(file);
-            }
-        }
-        else
-        {
-            // Show files that have ANY of the selected tags
-            foreach (var file in AllFiles)
-            {
-                if (file?.Tags != null && SelectedTagFilters.Any(selectedTag =>
-                    file.Tags.Values.Any(tagValue =>
-                        !string.IsNullOrEmpty(tagValue) &&
-                        tagValue.Equals(selectedTag.Name, StringComparison.OrdinalIgnoreCase))))
-                {
-                    Files.Add(file);
-                }
-            }
-        }
-        
-        // Also apply category filter
-        FilterFilesByCategory();
+        ApplyAllFilters();
     }
     
     private void FilterFilesByCategory()
     {
-        // Implement category filtering logic
-        FilterFilesByTag(); // Also apply tag filter
+        ApplyAllFilters();
+    }
+    
+    private void ApplyAllFilters()
+    {
+        Files.Clear();
+        
+        foreach (var file in AllFiles)
+        {
+            // Apply tag filtering
+            bool passesTagFilter = true;
+            if (SelectedTagFilters.Count > 0)
+            {
+                passesTagFilter = file?.Tags != null && SelectedTagFilters.Any(selectedTag =>
+                    file.Tags.Values.Any(tagValue =>
+                        !string.IsNullOrEmpty(tagValue) &&
+                        tagValue.Equals(selectedTag.Name, StringComparison.OrdinalIgnoreCase)));
+            }
+            
+            // Apply category filtering
+            bool passesCategoryFilter = true;
+            if (CurrentCategoryFilter != "All")
+            {
+                // Check if file matches the current category filter
+                passesCategoryFilter = file?.Tags != null && 
+                    file.Tags.ContainsKey("Category") && 
+                    file.Tags["Category"].Equals(CurrentCategoryFilter, StringComparison.OrdinalIgnoreCase);
+            }
+            
+            // File must pass both filters to be included
+            if (passesTagFilter && passesCategoryFilter)
+            {
+                Files.Add(file);
+            }
+        }
     }
     
     public event PropertyChangedEventHandler? PropertyChanged;
