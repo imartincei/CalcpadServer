@@ -19,6 +19,7 @@ public interface IBlobStorageService
     Task<bool> SetFileTagsAsync(string fileName, Dictionary<string, string> tags, UserContext userContext);
     Task<Dictionary<string, string>> GetFileTagsAsync(string fileName, UserContext userContext);
     Task<bool> DeleteFileTagsAsync(string fileName, UserContext userContext);
+    Task<string> GetFileBase64Async(string fileName, UserContext userContext);
 }
 
 public class BlobStorageService(IMinioClient minioClient, IConfiguration configuration, ILogger<BlobStorageService> logger, IUserService userService) : IBlobStorageService
@@ -527,5 +528,37 @@ public class BlobStorageService(IMinioClient minioClient, IConfiguration configu
             }
         }
     }
+        
+    public async Task<string> GetFileBase64Async(string fileName, UserContext userContext)
+        {
+            try
+            {
+                var bucketName = await DetermineBucketForFile(fileName);
+                
+                using var memoryStream = new MemoryStream();
+                
+                var getObjectArgs = new GetObjectArgs()
+                    .WithBucket(bucketName)
+                    .WithObject(fileName)
+                    .WithCallbackStream(stream =>
+                    {
+                        stream.CopyTo(memoryStream);
+                    });
 
+                await _minioClient.GetObjectAsync(getObjectArgs);
+                
+                var fileBytes = memoryStream.ToArray();
+                var base64String = Convert.ToBase64String(fileBytes);
+                
+                _logger.LogInformation("Retrieved base64 for file {FileName} from bucket {BucketName}, size: {Size} bytes", 
+                    fileName, bucketName, fileBytes.Length);
+                
+                return base64String;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting base64 for file {FileName}", fileName);
+                throw;
+            }
+        }
 }

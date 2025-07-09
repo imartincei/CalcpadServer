@@ -297,4 +297,27 @@ public class BlobStorageController : ControllerBase
             return StatusCode(500, "Internal server error");
         }
     }
+
+    [HttpGet("base64/{fileName}")]
+    public async Task<IActionResult> GetFileBase64(string fileName)
+    {
+        try
+        {
+            var userContext = (UserContext)HttpContext.Items["UserContext"]!;
+            
+            if (!await _blobStorageService.FileExistsAsync(fileName, userContext))
+            {
+                return NotFound($"File '{fileName}' not found");
+            }
+
+            var base64String = await _blobStorageService.GetFileBase64Async(fileName, userContext);
+            
+            return Ok(new { FileName = fileName, Base64 = base64String });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting base64 for file {FileName}", fileName);
+            return StatusCode(500, "Internal server error");
+        }
+    }
 }
