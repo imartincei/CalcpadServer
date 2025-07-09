@@ -24,6 +24,10 @@ namespace CalcpadViewer
             FilteredTags = new ObservableCollection<SelectableTag>();
             SelectedTags = new List<PreDefinedTag>();
             
+            // Handle null inputs
+            availableTags = availableTags ?? new List<PreDefinedTag>();
+            currentlySelectedTags = currentlySelectedTags ?? new List<PreDefinedTag>();
+            
             // Convert tags to selectable tags
             _allTags = availableTags.Select(tag => new SelectableTag 
             { 
@@ -46,6 +50,9 @@ namespace CalcpadViewer
 
         private void UpdateFilteredTags()
         {
+            if (FilteredTags == null || _allTags == null)
+                return;
+                
             FilteredTags.Clear();
             
             var filtered = _allTags.Where(tag => 
@@ -61,6 +68,12 @@ namespace CalcpadViewer
 
         private void UpdateSelectedTagsSummary()
         {
+            if (_allTags == null)
+            {
+                SelectedTagsSummary.Text = "No tags selected";
+                return;
+            }
+            
             var selectedCount = _allTags.Count(t => t.IsSelected);
             
             if (selectedCount == 0)
@@ -89,11 +102,14 @@ namespace CalcpadViewer
         {
             var checkBox = sender as CheckBox;
             var tag = checkBox?.DataContext as SelectableTag;
-            if (tag != null)
+            if (tag != null && _allTags != null)
             {
                 tag.IsSelected = true;
-                var originalTag = _allTags.First(t => t.Id == tag.Id);
-                originalTag.IsSelected = true;
+                var originalTag = _allTags.FirstOrDefault(t => t.Id == tag.Id);
+                if (originalTag != null)
+                {
+                    originalTag.IsSelected = true;
+                }
                 UpdateSelectedTagsSummary();
             }
         }
@@ -102,11 +118,14 @@ namespace CalcpadViewer
         {
             var checkBox = sender as CheckBox;
             var tag = checkBox?.DataContext as SelectableTag;
-            if (tag != null)
+            if (tag != null && _allTags != null)
             {
                 tag.IsSelected = false;
-                var originalTag = _allTags.First(t => t.Id == tag.Id);
-                originalTag.IsSelected = false;
+                var originalTag = _allTags.FirstOrDefault(t => t.Id == tag.Id);
+                if (originalTag != null)
+                {
+                    originalTag.IsSelected = false;
+                }
                 UpdateSelectedTagsSummary();
             }
         }
@@ -118,14 +137,20 @@ namespace CalcpadViewer
 
         private void SelectAllButton_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var tag in _allTags)
+            if (_allTags != null)
             {
-                tag.IsSelected = true;
+                foreach (var tag in _allTags)
+                {
+                    tag.IsSelected = true;
+                }
             }
             
-            foreach (var tag in FilteredTags)
+            if (FilteredTags != null)
             {
-                tag.IsSelected = true;
+                foreach (var tag in FilteredTags)
+                {
+                    tag.IsSelected = true;
+                }
             }
             
             UpdateSelectedTagsSummary();
@@ -133,14 +158,20 @@ namespace CalcpadViewer
 
         private void ClearAllButton_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var tag in _allTags)
+            if (_allTags != null)
             {
-                tag.IsSelected = false;
+                foreach (var tag in _allTags)
+                {
+                    tag.IsSelected = false;
+                }
             }
             
-            foreach (var tag in FilteredTags)
+            if (FilteredTags != null)
             {
-                tag.IsSelected = false;
+                foreach (var tag in FilteredTags)
+                {
+                    tag.IsSelected = false;
+                }
             }
             
             UpdateSelectedTagsSummary();
@@ -149,10 +180,9 @@ namespace CalcpadViewer
         private void OkButton_Click(object sender, RoutedEventArgs e)
         {
             // Get selected tags
-            SelectedTags = _allTags
-                .Where(tag => tag.IsSelected)
+            SelectedTags = _allTags?.Where(tag => tag.IsSelected)
                 .Select(tag => new PreDefinedTag { Id = tag.Id, Name = tag.Name })
-                .ToList();
+                .ToList() ?? new List<PreDefinedTag>();
             
             DialogResult = true;
             Close();
