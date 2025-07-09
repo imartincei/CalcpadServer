@@ -270,9 +270,15 @@ public class MainViewModel : INotifyPropertyChanged
             if (CurrentCategoryFilter != "All")
             {
                 // Check if file matches the current category filter
-                passesCategoryFilter = file?.Tags != null && 
-                    file.Tags.ContainsKey("Category") && 
-                    file.Tags["Category"].Equals(CurrentCategoryFilter, StringComparison.OrdinalIgnoreCase);
+                if (file?.Metadata != null)
+                {
+                    var category = file.Metadata.TryGetValue("file-category", out string? value) ? value : "Unknown";
+                    passesCategoryFilter = category.Equals(CurrentCategoryFilter, StringComparison.OrdinalIgnoreCase);
+                }
+                else
+                {
+                    passesCategoryFilter = false;
+                }
             }
             
             // File must pass both filters to be included
