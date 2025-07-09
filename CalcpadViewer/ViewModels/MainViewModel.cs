@@ -251,10 +251,18 @@ public class MainViewModel : INotifyPropertyChanged
             bool passesTagFilter = true;
             if (SelectedTagFilters.Count > 0)
             {
-                passesTagFilter = file?.Tags != null && SelectedTagFilters.Any(selectedTag =>
-                    file.Tags.Values.Any(tagValue =>
-                        !string.IsNullOrEmpty(tagValue) &&
-                        tagValue.Equals(selectedTag.Name, StringComparison.OrdinalIgnoreCase)));
+                if (file?.Tags != null)
+                {
+                    // Check if any selected tag matches any file tag value
+                    passesTagFilter = SelectedTagFilters.Any(selectedTag =>
+                        file.Tags.Values.Any(tagValue =>
+                            !string.IsNullOrEmpty(tagValue) &&
+                            tagValue.Equals(selectedTag.Name, StringComparison.OrdinalIgnoreCase)));
+                }
+                else
+                {
+                    passesTagFilter = false;
+                }
             }
             
             // Apply category filtering

@@ -143,6 +143,9 @@ public partial class MainWindow : Window
                     _viewModel.StatusText = $"Admin logged in: {authResponse.User.Username}";
                     AdminTab.IsEnabled = true;
                     TagsTab.IsEnabled = true;
+                    
+                    // Load tags immediately so they're available for filtering
+                    await _viewModel.LoadTags();
                 }
                 catch (Exception authEx)
                 {
@@ -268,7 +271,8 @@ public partial class MainWindow : Window
             }
             
             UpdateSelectedTagsDisplay();
-            FilterFilesByCategory();
+            _viewModel.FilterFilesByTag();
+            UpdateUIFromViewModel();
         }
     }
     
@@ -276,7 +280,8 @@ public partial class MainWindow : Window
     {
         _viewModel.SelectedTagFilters.Clear();
         UpdateSelectedTagsDisplay();
-        FilterFilesByCategory();
+        _viewModel.FilterFilesByTag();
+        UpdateUIFromViewModel();
     }
     
     private void UpdateSelectedTagsDisplay()
@@ -352,107 +357,65 @@ public partial class MainWindow : Window
 
     private void FilterFilesByCategory()
     {
-        // Debug: Log when this method is called with stack trace
-        System.Diagnostics.Debug.WriteLine($"FilterFilesByCategory called - Current selection: {FilesListBox.SelectedItem}");
-        System.Diagnostics.Debug.WriteLine($"Call stack: {Environment.StackTrace}");
+        // Call the ViewModel's filtering method instead of doing it here
+        _viewModel.FilterFilesByCategory();
         
-        try
+        // Update the UI to reflect the ViewModel's Files collection
+        UpdateUIFromViewModel();
+    }
+    
+    private void UpdateUIFromViewModel()
+    {
+        // Remember the currently selected file to restore after filtering
+        var currentlySelectedFile = FilesListBox.SelectedItem as string;
+        
+        // Clear and repopulate the UI list from the ViewModel's Files collection
+        FilesListBox.Items.Clear();
+        
+        foreach (var file in _viewModel.Files)
         {
-            // Remember the currently selected file to restore after filtering
-            var currentlySelectedFile = FilesListBox.SelectedItem as string;
-            
-            FilesListBox.Items.Clear();
-            _viewModel.Files.Clear();
-
-            // Start with all files or filter by category
-            IEnumerable<BlobMetadata> filteredFiles;
-            if (_viewModel.AllFiles == null)
+            if (!string.IsNullOrEmpty(file?.FileName))
             {
-                System.Diagnostics.Debug.WriteLine("_viewModel.AllFiles is null");
-                filteredFiles = [];
+                FilesListBox.Items.Add(file.FileName);
             }
-            else if (_viewModel.CurrentCategoryFilter == "All")
-            {
-                System.Diagnostics.Debug.WriteLine("Using all files filter");
-                filteredFiles = _viewModel.AllFiles;
-            }
-            else
-            {
-                System.Diagnostics.Debug.WriteLine($"Filtering by category: {_viewModel.CurrentCategoryFilter}");
-                filteredFiles = _viewModel.AllFiles.Where(f => 
-                {
-                    try
-                    {
-                        if (f?.Metadata == null) return false;
-                        var category = f.Metadata.TryGetValue("file-category", out string? value) ? value : "Unknown";
-                        return category?.Equals(_viewModel.CurrentCategoryFilter, StringComparison.OrdinalIgnoreCase) == true;
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error in category filter: {ex.Message}");
-                        return false;
-                    }
-                });
-            }
-
-            // Tag filtering is now handled by the ViewModel
-
-            System.Diagnostics.Debug.WriteLine("Adding filtered files to _viewModel.Files collection");
-            foreach(var file in filteredFiles) _viewModel.Files.Add(file);
-
-            // Add files to display without category brackets
-            foreach (var file in _viewModel.Files)
-            {
-                if (!string.IsNullOrEmpty(file?.FileName))
-                {
-                    FilesListBox.Items.Add(file.FileName);
-                }
-            }
-
-            // Restore the previously selected file if it's still in the filtered list
-            if (!string.IsNullOrEmpty(currentlySelectedFile))
-            {
-                try
-                {
-                    // Check if the file is still in the list by iterating instead of using Contains
-                    bool fileFound = false;
-                    foreach (var item in FilesListBox.Items)
-                    {
-                        if (item != null && item.ToString() == currentlySelectedFile)
-                        {
-                            fileFound = true;
-                            break;
-                        }
-                    }
-                    
-                    if (fileFound)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Restoring selection: {currentlySelectedFile}");
-                        FilesListBox.SelectedItem = currentlySelectedFile;
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"File not found in filtered list: {currentlySelectedFile}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error restoring selection: {ex.Message}");
-                }
-            }
-
-            var filterText = _viewModel.CurrentCategoryFilter;
-            if (_viewModel.SelectedTagFilters.Count > 0)
-            {
-                filterText += $", Tags: {string.Join(", ", _viewModel.SelectedTagFilters.Select(t => t.Name))}";
-            }
-            _viewModel.StatusText = $"Showing {_viewModel.Files.Count} files ({filterText})";
         }
-        catch (Exception ex)
+        
+        // Restore the previously selected file if it's still in the filtered list
+        if (!string.IsNullOrEmpty(currentlySelectedFile))
         {
-            System.Diagnostics.Debug.WriteLine($"Exception in FilterFilesByCategory: {ex}");
-            _viewModel.StatusText = "Error filtering files";
+            try
+            {
+                bool fileFound = false;
+                foreach (var item in FilesListBox.Items)
+                {
+                    if (item != null && item.ToString() == currentlySelectedFile)
+                    {
+                        FilesListBox.SelectedItem = item;
+                        fileFound = true;
+                        break;
+                    }
+                }
+                
+                if (!fileFound)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Previously selected file '{currentlySelectedFile}' not found in filtered list");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error restoring selected file: {ex.Message}");
+            }
         }
+        
+        // Update status text
+        var filterText = _viewModel.CurrentCategoryFilter;
+        if (_viewModel.SelectedTagFilters.Count > 0)
+        {
+            filterText += $", Tags: {string.Join(", ", _viewModel.SelectedTagFilters.Select(t => t.Name))}";
+        }
+        _viewModel.StatusText = $"Showing {_viewModel.Files.Count} files ({filterText})";
+        
+        System.Diagnostics.Debug.WriteLine($"UpdateUIFromViewModel completed - {FilesListBox.Items.Count} files displayed");
     }
 
 
